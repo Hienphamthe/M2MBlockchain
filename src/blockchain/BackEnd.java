@@ -16,9 +16,11 @@ import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -55,7 +57,6 @@ public class BackEnd {
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
     public  List<Transaction> TxMap = new ArrayList<>(); 
-//    private static Block unpackBlock = new Block();
     public final Gson gson = new GsonBuilder().create();
     public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();     
     // </editor-fold>
@@ -137,11 +138,11 @@ public class BackEnd {
         // <editor-fold defaultstate="collapsed" desc="P2p communication">
         /**
          * P2p communication
-         * Execute each 1000ms period
+         * Execute each 2000ms period
          */
 
         
-        TimeUnit.SECONDS.sleep(1);
+        TimeUnit.MILLISECONDS.sleep(500);
         LOGGER.info("P2P communication!");
         // ********************************
         // Broadcast asking neighbors for genesis block
@@ -149,6 +150,8 @@ public class BackEnd {
         if (blockChain.isEmpty()) {
             peerNetwork.broadcast("VERSION "+0);
         }
+        
+            // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
         while (true) {
             // Write a file to the newly connected peer, and start the direct connection next time.
             for (String peer : peerNetwork.peersList) {
@@ -229,10 +232,17 @@ public class BackEnd {
                     }
                 }                    
             }
+            // </editor-fold>
             
-            // ********************************
-            // Compare block height, sync block
-            // ********************************
+            // <editor-fold defaultstate="collapsed" desc="Automation mining">
+            if (TXmempool.size()>=3){                
+                LOGGER.info("Auto mining with difficulty = 3");
+                String logger = mineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
+                LOGGER.info(logger);
+            }
+            // </editor-fold>
+            
+            // <editor-fold defaultstate="collapsed" desc="Compare block height, sync block">
             int localHeight = blockChain.size();
             if (bestHeight > localHeight) {
                 LOGGER.info("Local chain height: " + localHeight+" Best chain Height: " + bestHeight);
@@ -242,150 +252,152 @@ public class BackEnd {
                     peerNetwork.broadcast("GET_BLOCK " + i);
                 }
             }
+            // </editor-fold>
             
-            
-            // ********************************
-            // Handling RPC services
-            // ********************************
+            // <editor-fold defaultstate="collapsed" desc="Handling RPC communication">
             for (RpcThread th:rpcAgent.rpcThreads) {
                 String request = th.req;
                 if (request != null) { //any request have 3 parts: verb & indirectobject & directobject
                     String[] parts = request.split(" ");
                     parts[0] = parts[0].toLowerCase();
-                    if ("getinfo".equals(parts[0])) {
-                        th.res = (blockChain.isEmpty()) ? "Empty blockchain." : prettyGson.toJson(blockChain);
-                    } else if ("createwallet".equals(parts[0])) {
-                        th.res =(createNodeWallet()) ? "My public key:" +myNode.publickey : "Unable to create new wallet.";
-                    } else if("getaddr".equals(parts[0])){
-                        th.res = (myNode==null) ? "This node does not control any wallet. Please createwallet or unlock an existing one!" : myNode.publickey;
-                    } else if("getpendingtx".equals(parts[0])){
-                        th.res = (TXmempool.isEmpty()) ?  "Tx mempool is empty." : prettyGson.toJson(TXmempool);                        
-                    } else if("unlock".equals(parts[0])){
-                        if (parts.length==3){
-                            try {
-                                String publicKey = parts[1];
-                                String privateKey = parts[2];
-                                myNode = new NodeWallet(publicKey, privateKey);
-                                th.res = (myNode==null) ? "Wrong authenication!" : "Address :"+myNode.publickey+" is validated!";                            
-                            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                                ex.printStackTrace();
-                            }
-                        } else {
-                            th.res = "Wrong syntax.";
-                        }       
-                    } else if("send".equals(parts[0])){
-                        if (parts.length==3){
-                            if (myNode==null) {
-                                th.res = "This node does not control any wallet. Please createwallet or unlock an existing one!";
-                            } else {
-                                try {
-                                    String toAddress = parts[1];
-                                    String mesg = parts[2];
-                                    if (toAddress.isEmpty() || mesg.isEmpty()) {
-                                        th.res = "Wrong syntax - send <to address> <data>";
-                                    } else {
-                                        LOGGER.info("My node is Attempting to send message ("+mesg+") to "+toAddress+"...");
-                                        Transaction tx = myNode.sendFunds(DecodeRecipient(toAddress), mesg);
-                                        if(tx!=null && tx.processTransaction()){                                    
-                                            TXmempool.add(tx);
-                                            th.res = "Transaction write Success!";
-                                            peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx));
-                                        }
-                                    }
-                                } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                                    ex.getStackTrace();
-                                }
-                            }
-                        } else {
-                            th.res = "Wrong syntax.";
-                        }
-//                    } else if("buildreport".equals(parts[0])){
-//                        System.out.println("1");
-//                        th.res = "Start building report.";
-//                        while(!th.req.equalsIgnoreCase("done")){
-//                            String[] reportElement = th.req.split(" ");
-//                            if (reportElement.length==2){
-//                                String serviceName = reportElement[0];
-//                                String Comment = reportElement[1];
-//                            } else {
-//                                th.res = "Wrong report syntax.";
-//                                break;
-//                            }
-//                        }                    
-                    } else if ("filterblock".equals(parts[0])) {
-                        if (parts.length==3){
-                            String fieldName = parts[1];
-                            String value = parts[2];
-                            List<Block> resultBlock = null;
-                            resultBlock = blockChain.stream()
-                                    .filter(singleBlock -> Objects.equals(FindField(singleBlock, fieldName), value))
-                                    .collect(Collectors.toList());
-                            if (!(resultBlock.isEmpty())) {
-                                th.res = prettyGson.toJson(resultBlock);
-                            } else {
-                                resultBlock = blockChain.stream()
-                                        .filter(singleBlock -> Objects.equals(FindField(singleBlock.transactions.listIterator(0).next(), fieldName), value))
-                                        .collect(Collectors.toList());
-                                th.res = (!(resultBlock.isEmpty())) ? prettyGson.toJson(resultBlock) : "No block found.";
-                            }
-                        } else {
-                            th.res = "Wrong syntax.";
-                        }
-                    }else if ("filtertx".equals(parts[0])) {                        
-                        if (parts.length==3){
-                            String fieldName = parts[1];
-                            String value = parts[2];
-                            List<Transaction> resultTx = TxMap.stream()
-                                    .filter(singleTx -> Objects.equals(FindField(singleTx, fieldName), value))
-                                    .collect(Collectors.toList());
-                            th.res = !resultTx.isEmpty() ? prettyGson.toJson(resultTx) : "No transaction found.";
-                        } else {
-                            th.res = "Wrong syntax.";
-                        }             
-                    } else if ("mine".equals(parts[0])) {
-                        if (parts.length==2){
-                            try {
-                                int difficulty = Integer.parseInt(parts[1]);
-                                // Mining and packing new blocks
-                                if(TXmempool.isEmpty()){
-                                    th.res = "Block write failed! No Transaction existed!";
-                                } else {
-                                        Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
-                                        if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
-                                            blockChain.add(newBlock);
-                                            th.res = "Block write Success!";
-                                            FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);
-                                            peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));
-                                            TxMap.addAll(TXmempool);
-                                            TXmempool.clear();                                        
-                                        } else {
-                                            th.res = "Invalid block";
-                                        }
-                                    }
-                            } catch (Exception e) {
-                                th.res = "Syntax (no '<' or '>'): send <mesg> - message to send";
-                                LOGGER.error("invalid mesg");
-                            }
-                        } else {
-                            th.res = "Wrong syntax.";
-                        }
-                    }
-                    else {
+                    if (null == parts[0]) {
                         th.res = "Unknown command: \"" + parts[0] + "\" ";
+                    } else switch (parts[0]) {
+                        case "getinfo":
+                            th.res = (blockChain.isEmpty()) ? "Empty blockchain." : prettyGson.toJson(blockChain);
+                            break;
+                        case "createwallet":
+                            th.res =(createNodeWallet()) ? "My public key:" +myNode.publickey : "Unable to create new wallet.";
+                            break;
+                        case "getaddr":
+                            th.res = (myNode==null) ? "This node does not control any wallet. Please createwallet or unlock an existing one!" : myNode.publickey;
+                            break;
+                        case "getpendingtx":
+                            th.res = (TXmempool.isEmpty()) ?  "Tx mempool is empty." : prettyGson.toJson(TXmempool);
+                            break;
+                        case "unlock":
+                            if (parts.length==3){
+                                try {
+                                    String publicKey = parts[1];
+                                    String privateKey = parts[2];
+                                    myNode = new NodeWallet(publicKey, privateKey);
+                                    th.res = (myNode==null) ? "Wrong authenication!" : "Address :"+myNode.publickey+" is validated!";
+                                } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
+                                    ex.printStackTrace();
+                                }
+                            } else {
+                                th.res = "Wrong syntax.";
+                            }   break;
+                        case "send":
+                            if (parts.length==3){
+                                if (myNode==null) {
+                                    th.res = "This node does not control any wallet. Please createwallet or unlock an existing one!";
+                                } else {
+                                    try {
+                                        String toAddress = parts[1];
+                                        String mesg = parts[2];
+                                        if (mesg.split(":").length!=2) {
+                                            th.res = "Wrong syntax - send <to address> <data>";
+                                        } else {
+                                            LOGGER.info("My node is Attempting to send message ("+mesg+") to "+toAddress+"...");
+                                            Transaction tx = myNode.sendFunds(DecodeRecipient(toAddress), mesg);
+                                            if(tx!=null && tx.processTransaction()){
+                                                TXmempool.add(tx);
+                                                th.res = "Transaction write Success!";
+                                                peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx));
+                                            }
+                                        }
+                                    } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
+                                        ex.getStackTrace();
+                                    }
+                                }
+                            } else {
+                                th.res = "Wrong syntax.";
+                            }                  
+                            break;
+                        case "filterblock":
+                            if (parts.length==3){
+                                String fieldName = parts[1];
+                                String value = parts[2];
+                                List<Block> resultBlock = null;
+                                resultBlock = blockChain.stream()
+                                        .filter(singleBlock -> Objects.equals(FindField(singleBlock, fieldName), value))
+                                        .collect(Collectors.toList());
+                                if (!(resultBlock.isEmpty())) {
+                                    th.res = prettyGson.toJson(resultBlock);
+                                } else {
+                                    List<Transaction> resultTx = FilterTx(fieldName, value);
+                                    if (resultTx==null) {
+                                        th.res = "No block found. Note: case sensitive";
+                                    } else {
+                                        resultBlock = blockChain.stream()
+                                                .filter(singleBlock ->  {
+                                                    boolean result = false;
+                                                    for (Transaction temp : singleBlock.transactions) {
+                                                        for (Transaction temp2 : resultTx) {
+                                                            if (temp.transactionId.equals(temp2.transactionId)) {
+                                                               result = true;
+                                                               break;
+                                                            }
+                                                        }
+                                                    }
+                                                    return result;
+                                                })
+                                                .collect(Collectors.toList());
+                                        th.res = (!(resultBlock.isEmpty())) ? prettyGson.toJson(resultBlock) : "No block found. Note: case sensitive";
+                                    }
+//                                    resultBlock = blockChain.stream()
+//                                            .filter(singleBlock -> Objects.equals(FindFieldBlockTx(singleBlock.transactions, fieldName, value), value))
+//                                            .collect(Collectors.toList()); 
+                                }
+                            } else {
+                                th.res = "Wrong syntax.";
+                            }   break;
+                        case "filtertx":
+                            if (parts.length==3){
+                                String fieldName = parts[1];
+                                String value = parts[2];
+                                List<Transaction> resultTx = FilterTx(fieldName, value);
+                                th.res = !resultTx.isEmpty() ? prettyGson.toJson(resultTx):"Transaction not found.";
+                            } else {
+                                th.res = "Wrong syntax.";
+                            }   break;
+                        case "mine":
+                            if (parts.length==2){
+                                try {
+                                    int difficulty = Integer.parseInt(parts[1]);
+                                    // Mining and packing new blocks
+                                    if(TXmempool.isEmpty()){
+                                        th.res = "Block write failed! No Transaction existed!";
+                                    } else {
+                                        th.res = mineBlock(difficulty, peerNetwork) ? "Block write Success!" : "Invalid block";
+                                    }
+                                } catch (NumberFormatException e) {
+                                    th.res = "Syntax (no '<' or '>'): send <mesg> - message to send";
+                                    LOGGER.error("invalid mesg");
+                                }
+                            } else {
+                                th.res = "Wrong syntax.";
+                            }   break;
+                        default:
+                            th.res = "Unknown command: \"" + parts[0] + "\" ";
+                            break;
                     }
                 }
-            }
-        TimeUnit.SECONDS.sleep(2);
+            }        
         // </editor-fold>
+        TimeUnit.MILLISECONDS.sleep(500);
         } 
+        // </editor-fold>
     }
     
+    // <editor-fold defaultstate="collapsed" desc="Methods">
     private Block GenesisBlockGenerator () {      
         NodeWallet coinbase = new NodeWallet();
         // hardcode genesisBlock
         // create genesis transaction, which sends message "service1_good" to walletA: 
         genesisTransaction = new Transaction();
-        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "service1_good");        
+        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data");        
         genesisTransaction.generateSignature(coinbase.privateKey);	 //manually sign the genesis transaction	
         genesisTransaction.transactionId = "0";                          //manually set the transaction id        
         
@@ -446,17 +458,72 @@ public class BackEnd {
         return ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
     }  
 
-    private <T> String FindField(T singleElement, String fieldName) {
+    private String FindFieldBlockTx(List<Transaction> transactions, String fieldName, String value) {
+        String fieldValueCorrect = null;
+        for (Transaction tx : transactions) {
+            String fieldValue = FindField(tx, fieldName);
+            if (fieldValue.equals(value)) {
+                fieldValueCorrect = fieldValue;
+                break;
+            }
+        }
+        return fieldValueCorrect;
+    }
+    
+    private <T> String FindField(T singleElement, String fieldName) { // T: Block or Tx
         String fieldValue = null;
-            Class<?> clazz = singleElement.getClass();
-            Field field;
-            try {
-                field = clazz.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                fieldValue = field.get(singleElement).toString();
-            } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {                
-                LOGGER.error("No such field in FindFieldBlock(). (Optional) Keep searching in transactions field");
-            }       
+        Class<?> clazz = singleElement.getClass();
+        Field field;
+        try {
+            field = clazz.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            fieldValue = field.get(singleElement).toString();
+        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {                
+            LOGGER.error("No such field in FindFieldBlock(). (Optional) Keep searching in transactions field");
+        }       
         return fieldValue;
+    }
+
+
+    private boolean mineBlock(int difficulty, PeerNetwork peerNetwork) {
+        boolean status = false;
+        Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
+        if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
+            try {
+                blockChain.add(newBlock);
+                status = true;
+                FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);
+                peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));
+                TxMap.addAll(TXmempool);                                        
+                TXmempool.clear();
+            } catch (IOException ex) {
+                java.util.logging.Logger.getLogger(BackEnd.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else {
+            status = false;
+        }
+        return status;
+    }
+    // </editor-fold>
+
+    private List<Transaction> FilterTx(String fieldName, String value) {
+        List<Transaction> resultTx = TxMap.stream()
+            .filter(singleTx -> Objects.equals(FindField(singleTx, fieldName), value))
+            .collect(Collectors.toList());
+        if (!(resultTx.isEmpty())) {
+            return resultTx;
+        } else {
+            resultTx = TxMap.stream()
+                .filter(singleTx -> Objects.equals((singleTx.message.split(":"))[0], value))
+                .collect(Collectors.toList());
+            if (!(resultTx.isEmpty())) {
+                return resultTx;
+            } else {
+                resultTx = TxMap.stream()
+                .filter(singleTx -> Objects.equals((singleTx.message.split(":"))[1], value))
+                .collect(Collectors.toList());
+                return (!(resultTx.isEmpty())) ? resultTx : null;
+            }
+        }
     }
 }

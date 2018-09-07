@@ -40,34 +40,25 @@ public class RpcThread extends Thread {
             out.println("[   Welcome RPC Daemon    ]");
             while((input = in.readLine()) != null){
                 if ("HELP".equalsIgnoreCase(input)){
-                    out.println("################################################# COMMANDS ##################################################");
-                    out.println("#     1) getinfo                           - Gets block chain infomations.                                  #");
-                    out.println("#     1) createwallet                      - Create a new wallet address.                                   #");
-                    out.println("#     1) unlock <publickey> <privatekey>   - Create a new wallet address.                                   #");
-                    out.println("#     2) getpendingtx                      - Gets all pending transactions.                                 #");
-                    out.println("#     2) filterblock <block fields> <value>- Filter blockchain based on block fields                        #");
-                    out.println("#     2) filtertx <tx fields> <value>      - Filter transaction based on its fields                         #");                    
-                    out.println("#     2) getaddr                           - Gets my public key                                             #");
-                    out.println("#     3) send <to address> <data/report>   - Send <data/report> in atransaction.                            #");
-                    out.println("#     3) buildreport                       - Build a report.                                                #");
-                    out.println("#                                            Type \"done\" when finish report                                 #");
-                    out.println("#                                            Report syntax <serviceName>:<comment>                          #");
-                    out.println("#     4) mine <difficulty>                 - Mine <difficulty> with Block.                                  #");
-                    out.println("#############################################################################################################");
+                    out.println("################################################# COMMANDS ####################################################");
+                    out.println("#     1) getinfo                           - Gets block chain infomations.                                    #");
+                    out.println("#     2) createwallet                      - Create a new wallet address.                                     #");
+                    out.println("#     3) unlock <publickey> <privatekey>   - Create a new wallet address.                                     #");
+                    out.println("#     4) getpendingtx                      - Gets all pending transactions.                                   #");
+                    out.println("#     5) filterblock <block fields> <value>- Filter blockchain based on block fields                          #");
+                    out.println("#     6) filtertx <tx fields> <value>      - Filter transaction based on its fields                           #");
+                    out.println("#     7) getaddr                           - Gets my public key                                               #");
+                    out.println("#     8) send <to address> <service:data>  - Send <data> in atransaction.                                     #");
+                    out.println("#     9) mine <difficulty>                 - Mine <difficulty> with Block.                                    #");
+                    out.println("###############################################################################################################");
                 } else {
                     req = input;
-//                    if (input.equals("buildreport")){
-//                        out.println("Start building report.");
-//                        req = null;
-//                        res = null;
-//                    } else {
-                        while (res == null){
-                            TimeUnit.MILLISECONDS.sleep(25);
-                        }
-                        out.println(res);
-                        req = null;
-                        res = null;
-//                    }                    
+                    while (res == null){
+                        TimeUnit.MILLISECONDS.sleep(25);
+                    }
+                    out.println(res);
+                    req = null;
+                    res = null;
                 }
             }
         } catch (Exception e){
