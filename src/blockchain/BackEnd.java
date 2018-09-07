@@ -346,9 +346,6 @@ public class BackEnd {
                                                 .collect(Collectors.toList());
                                         th.res = (!(resultBlock.isEmpty())) ? prettyGson.toJson(resultBlock) : "No block found. Note: case sensitive";
                                     }
-//                                    resultBlock = blockChain.stream()
-//                                            .filter(singleBlock -> Objects.equals(FindFieldBlockTx(singleBlock.transactions, fieldName, value), value))
-//                                            .collect(Collectors.toList()); 
                                 }
                             } else {
                                 th.res = "Wrong syntax.";
@@ -457,18 +454,6 @@ public class BackEnd {
         X509EncodedKeySpec  x509EncodedKeySpecRecipient = new X509EncodedKeySpec (reciepientEncoded);   
         return ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
     }  
-
-    private String FindFieldBlockTx(List<Transaction> transactions, String fieldName, String value) {
-        String fieldValueCorrect = null;
-        for (Transaction tx : transactions) {
-            String fieldValue = FindField(tx, fieldName);
-            if (fieldValue.equals(value)) {
-                fieldValueCorrect = fieldValue;
-                break;
-            }
-        }
-        return fieldValueCorrect;
-    }
     
     private <T> String FindField(T singleElement, String fieldName) { // T: Block or Tx
         String fieldValue = null;
@@ -504,8 +489,7 @@ public class BackEnd {
         }
         return status;
     }
-    // </editor-fold>
-
+    
     private List<Transaction> FilterTx(String fieldName, String value) {
         List<Transaction> resultTx = TxMap.stream()
             .filter(singleTx -> Objects.equals(FindField(singleTx, fieldName), value))
@@ -526,4 +510,5 @@ public class BackEnd {
             }
         }
     }
+    // </editor-fold>
 }
