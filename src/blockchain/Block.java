@@ -115,6 +115,12 @@ public class Block {
         return newBlock;
     }
 
+    @Override
+    public boolean equals (Object o) {
+        Block block = (Block) o;
+        return (block.hash == null ? this.hash == null : block.hash.equals(this.hash));
+    }
+    
     /** getters and setters**/
     public int getIndex() {
         return index;

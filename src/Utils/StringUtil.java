@@ -3,7 +3,6 @@ package Utils;
 import blockchain.Transaction;
 import java.security.*;
 import java.util.ArrayList;
-import java.util.Base64;
 import com.google.gson.GsonBuilder;
 import java.net.InetAddress;
 import java.net.NetworkInterface;

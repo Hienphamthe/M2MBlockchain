@@ -3,9 +3,16 @@ import Utils.StringUtil;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Transaction {
+        private static final Logger LOGGER = LoggerFactory.getLogger(Block.class);
 	public String transactionId; //Contains a hash of transaction*
+        public String sequence; 
+        public String timestamps;
 	public transient PublicKey senderPubKey; //Senders address public key.
         public String sender;
 	public transient PublicKey recipientPubKey; //Recipients address/public key.
@@ -14,34 +21,45 @@ public class Transaction {
 	public transient byte[] signatureByte; //This is to prevent anybody else from spending funds in our wallet.
         public String signature;
 	
-	private static int sequence = 0; //A rough count of how many transactions have been generated 
+	
 	
 	public boolean processTransaction() {		
             if(verifySignature() == false) {
-                System.out.println("Transaction Signature failed to verify");
+                LOGGER.info("Transaction Signature failed to verify");
                 return false;
-            }								
+            }
+            if(verifyCypherText() == false) {
+                LOGGER.info("Transaction data was changed.");
+                return false;
+            }
             return true;
 	}
 	
-	public void generateSignature(PrivateKey privateKey) {            
-		String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + message;                
-		signatureByte = StringUtil.applyECDSASig(privateKey,data);
-                signature = StringUtil.encodeSignature(signatureByte);
-                transactionId = calulateHash();
+	public void generateSignature(PrivateKey privateKey) {  
+            timestamps = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message; 
+            try {
+                SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+                sequence = String.valueOf(random.nextInt());
+            } catch (NoSuchAlgorithmException ex) {
+                LOGGER.info("No random generator algo exists.");
+            }
+            transactionId = calulateHash(data);
+            signatureByte = StringUtil.applyECDSASig(privateKey,transactionId);
+            signature = StringUtil.encodeSignature(signatureByte);
 	}
 	
 	public boolean verifySignature() {
-		String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + message;                
-		return StringUtil.verifyECDSASig(senderPubKey, data, signatureByte);
+            return StringUtil.verifyECDSASig(senderPubKey, transactionId, signatureByte);
 	}	
+        
+        public boolean verifyCypherText() {
+            String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message;
+            return (calulateHash(data) == null ? transactionId == null : calulateHash(data).equals(transactionId));
+        }
 	
-	private String calulateHash() {
-		sequence++; //increase the sequence to avoid 2 identical transactions having the same hash
-		return StringUtil.applySha256(StringUtil.getStringFromKey(senderPubKey) +
-				StringUtil.getStringFromKey(recipientPubKey) +
-				message + sequence
-				);
+	private String calulateHash(String data) {
+            return StringUtil.applySha256(data + sequence);
 	}
         
         public void setInputVariable (PublicKey from, PublicKey to, String mesg) {
@@ -51,10 +69,12 @@ public class Transaction {
             this.recipient = StringUtil.getStringFromKey(recipientPubKey);
             this.sender = StringUtil.getStringFromKey(senderPubKey);
         }
-        
-        public boolean isMine(PublicKey publicKey) {
-            return (publicKey == recipientPubKey);
-	}
+
+        @Override
+        public boolean equals (Object o) {
+            Transaction tx = (Transaction) o;
+            return (tx.transactionId == null ? this.transactionId == null : tx.transactionId.equals(this.transactionId));
+        }
         
         public void Transaction () throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {            
             if (!sender.isEmpty() && !recipient.isEmpty() && !signature.isEmpty()){

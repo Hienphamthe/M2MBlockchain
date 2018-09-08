@@ -16,7 +16,6 @@ import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -91,7 +90,7 @@ public class BackEnd {
         // no previous blockchain currently exists and could not find bootstrap node, create genesis block 
         if (!peerFile.exists() && !dataFile.exists()) {
             createNodeWallet();
-            Block genesisBlock = GenesisBlockGenerator();
+            Block genesisBlock = (myNode!=null) ? GenesisBlockGenerator() : null;
             FileUtils.writeStringToFile(dataFile,gson.toJson(genesisBlock), StandardCharsets.UTF_8,true);
             LOGGER.info("Empty peerFile. Creating new one ...");                
             FileUtils.writeStringToFile(peerFile, localHost+":"+localPort,StandardCharsets.UTF_8,true);
@@ -209,12 +208,27 @@ public class BackEnd {
                                     blockChain.add(newBlock);
                                     TxMap.addAll(newBlock.transactions);
                                     LOGGER.info("Added block " + newBlock.getIndex() + " with hash: ["+ newBlock.getHash() + "]");
+                                    TXmempool.removeAll(newBlock.transactions);
+                                    TXmempool = TXmempool.stream()
+                                        .filter(singleTx -> {
+                                            boolean result = true;
+                                            for (Transaction tempTx : newBlock.transactions) {                                                
+                                                if (singleTx.equals(tempTx)){
+                                                    result = false;
+                                                    break;
+                                                }
+                                            }
+                                            return result;
+                                        })
+                                        .collect(Collectors.toList());
+                                    
+                                    
                                     if (newBlock.getIndex()==0){FileUtils.writeStringToFile(dataFile,gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
                                     else {FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
                                     peerNetwork.broadcast("BLOCK " + payload);
-                                } else {
+                                } else if (!(newBlock.getIndex()==0)) {
                                     LOGGER.info("Invalid block.");
-                                }   
+                                }
                             }
                         }
                         else if ("TRANSACTION".equalsIgnoreCase(cmd)) {
@@ -237,7 +251,7 @@ public class BackEnd {
             // <editor-fold defaultstate="collapsed" desc="Automation mining">
             if (TXmempool.size()>=3){                
                 LOGGER.info("Auto mining with difficulty = 3");
-                String logger = mineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
+                String logger = MineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
                 LOGGER.info(logger);
             }
             // </editor-fold>
@@ -319,34 +333,8 @@ public class BackEnd {
                             if (parts.length==3){
                                 String fieldName = parts[1];
                                 String value = parts[2];
-                                List<Block> resultBlock = null;
-                                resultBlock = blockChain.stream()
-                                        .filter(singleBlock -> Objects.equals(FindField(singleBlock, fieldName), value))
-                                        .collect(Collectors.toList());
-                                if (!(resultBlock.isEmpty())) {
-                                    th.res = prettyGson.toJson(resultBlock);
-                                } else {
-                                    List<Transaction> resultTx = FilterTx(fieldName, value);
-                                    if (resultTx==null) {
-                                        th.res = "No block found. Note: case sensitive";
-                                    } else {
-                                        resultBlock = blockChain.stream()
-                                                .filter(singleBlock ->  {
-                                                    boolean result = false;
-                                                    for (Transaction temp : singleBlock.transactions) {
-                                                        for (Transaction temp2 : resultTx) {
-                                                            if (temp.transactionId.equals(temp2.transactionId)) {
-                                                               result = true;
-                                                               break;
-                                                            }
-                                                        }
-                                                    }
-                                                    return result;
-                                                })
-                                                .collect(Collectors.toList());
-                                        th.res = (!(resultBlock.isEmpty())) ? prettyGson.toJson(resultBlock) : "No block found. Note: case sensitive";
-                                    }
-                                }
+                                List<Block> resultBlock = FilterBlock(fieldName, value);
+                                th.res = !resultBlock.isEmpty() ? prettyGson.toJson(resultBlock):"Block not found.";
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
@@ -367,10 +355,10 @@ public class BackEnd {
                                     if(TXmempool.isEmpty()){
                                         th.res = "Block write failed! No Transaction existed!";
                                     } else {
-                                        th.res = mineBlock(difficulty, peerNetwork) ? "Block write Success!" : "Invalid block";
+                                        th.res = MineBlock(difficulty, peerNetwork) ? "Block write Success!" : "Invalid block";
                                     }
                                 } catch (NumberFormatException e) {
-                                    th.res = "Syntax (no '<' or '>'): send <mesg> - message to send";
+                                    th.res = "Syntax (no '<' or '>'): mine <difficulty> - mine a block with <difficulty>";
                                     LOGGER.error("invalid mesg");
                                 }
                             } else {
@@ -394,7 +382,8 @@ public class BackEnd {
         // hardcode genesisBlock
         // create genesis transaction, which sends message "service1_good" to walletA: 
         genesisTransaction = new Transaction();
-        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data");        
+        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data"); 
+        genesisTransaction.timestamps = "2018-07-08 00:00:00";
         genesisTransaction.generateSignature(coinbase.privateKey);	 //manually sign the genesis transaction	
         genesisTransaction.transactionId = "0";                          //manually set the transaction id        
         
@@ -470,7 +459,7 @@ public class BackEnd {
     }
 
 
-    private boolean mineBlock(int difficulty, PeerNetwork peerNetwork) {
+    private boolean MineBlock(int difficulty, PeerNetwork peerNetwork) {
         boolean status = false;
         Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
         if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
@@ -510,5 +499,35 @@ public class BackEnd {
             }
         }
     }
+
+    private List<Block> FilterBlock(String fieldName, String value) {
+        List<Block> resultBlock = blockChain.stream()
+            .filter(singleBlock -> Objects.equals(FindField(singleBlock, fieldName), value))
+            .collect(Collectors.toList());
+        if (!(resultBlock.isEmpty())) {
+            return resultBlock;
+        } else {
+            List<Transaction> resultTx = FilterTx(fieldName, value);
+            if (resultTx==null) {
+                return null;
+            } else {
+                resultBlock = blockChain.stream()
+                        .filter(singleBlock ->  {
+                            boolean result = false;
+                            for (Transaction temp : singleBlock.transactions) {
+                                for (Transaction temp2 : resultTx) {
+                                    if (temp.equals(temp2)) {
+                                       result = true;
+                                       break;
+                                    }
+                                }
+                            }
+                            return result;
+                        }).collect(Collectors.toList());
+                return !resultBlock.isEmpty() ? resultBlock : null;
+            }
+        }
+    }
+    
     // </editor-fold>
 }
