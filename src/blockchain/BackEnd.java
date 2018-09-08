@@ -60,7 +60,7 @@ public class BackEnd {
     public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();     
     // </editor-fold>
 
-    public void startBackend() throws IOException, InterruptedException{
+    public boolean startBackend() throws IOException, InterruptedException{
         peersListMainThread = new ArrayList<>();
         
         // <editor-fold defaultstate="collapsed" desc="Acquire local IP address">
@@ -208,9 +208,8 @@ public class BackEnd {
                                     blockChain.add(newBlock);
                                     TxMap.addAll(newBlock.transactions);
                                     LOGGER.info("Added block " + newBlock.getIndex() + " with hash: ["+ newBlock.getHash() + "]");
-                                    TXmempool.removeAll(newBlock.transactions);
-                                    TXmempool = TXmempool.stream()
-                                        .filter(singleTx -> {
+                                    // Remove already mined transaction
+                                    TXmempool = TXmempool.stream().filter(singleTx -> {
                                             boolean result = true;
                                             for (Transaction tempTx : newBlock.transactions) {                                                
                                                 if (singleTx.equals(tempTx)){
@@ -219,9 +218,7 @@ public class BackEnd {
                                                 }
                                             }
                                             return result;
-                                        })
-                                        .collect(Collectors.toList());
-                                    
+                                        }).collect(Collectors.toList());
                                     
                                     if (newBlock.getIndex()==0){FileUtils.writeStringToFile(dataFile,gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
                                     else {FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
@@ -334,7 +331,7 @@ public class BackEnd {
                                 String fieldName = parts[1];
                                 String value = parts[2];
                                 List<Block> resultBlock = FilterBlock(fieldName, value);
-                                th.res = !resultBlock.isEmpty() ? prettyGson.toJson(resultBlock):"Block not found.";
+                                th.res = resultBlock!=null ? prettyGson.toJson(resultBlock): "Block not found.";
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
@@ -343,7 +340,7 @@ public class BackEnd {
                                 String fieldName = parts[1];
                                 String value = parts[2];
                                 List<Transaction> resultTx = FilterTx(fieldName, value);
-                                th.res = !resultTx.isEmpty() ? prettyGson.toJson(resultTx):"Transaction not found.";
+                                th.res = resultTx!=null ? prettyGson.toJson(resultTx):"Transaction not found.";
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
@@ -351,7 +348,6 @@ public class BackEnd {
                             if (parts.length==2){
                                 try {
                                     int difficulty = Integer.parseInt(parts[1]);
-                                    // Mining and packing new blocks
                                     if(TXmempool.isEmpty()){
                                         th.res = "Block write failed! No Transaction existed!";
                                     } else {
@@ -359,7 +355,6 @@ public class BackEnd {
                                     }
                                 } catch (NumberFormatException e) {
                                     th.res = "Syntax (no '<' or '>'): mine <difficulty> - mine a block with <difficulty>";
-                                    LOGGER.error("invalid mesg");
                                 }
                             } else {
                                 th.res = "Wrong syntax.";
@@ -457,7 +452,6 @@ public class BackEnd {
         }       
         return fieldValue;
     }
-
 
     private boolean MineBlock(int difficulty, PeerNetwork peerNetwork) {
         boolean status = false;

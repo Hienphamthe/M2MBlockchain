@@ -104,7 +104,6 @@ public class Block {
         for (Transaction tx : transactions){
             newBlock.addTransaction(tx);
         }
-        newBlock.transactions = transactions;
         newBlock.setIndex(oldBlock.getIndex() + 1);
         newBlock.setTxAmount(transactions.size());
         newBlock.setTimestamp(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
