@@ -133,26 +133,23 @@ public class StringUtil {
         return Base58.decode(sigString);
     }
 
+    
     public static String getMerkleRoot(List<Transaction> transactions) {
-        int count = transactions.size();
-
-        List<String> previousTreeLayer = new ArrayList<String>();
-        for(Transaction transaction : transactions) {
-                previousTreeLayer.add(transaction.transactionId);
+        ArrayList<String> tree = new ArrayList<>();
+        for (Transaction t : transactions) {
+            tree.add(t.transactionId);
         }
-        List<String> treeLayer = previousTreeLayer;
-
-        while(count > 1) {
-            treeLayer = new ArrayList<String>();
-            for(int i=1; i < previousTreeLayer.size(); i+=2) {
-                    treeLayer.add(applySha256(previousTreeLayer.get(i-1) + previousTreeLayer.get(i)));
+        int levelOffset = 0;
+        for (int levelSize = transactions.size(); levelSize > 1; levelSize = (levelSize + 1) / 2) {
+            for (int left = 0; left < levelSize; left += 2) {
+                int right = Math.min(left + 1, levelSize - 1);
+                String tleft = tree.get(levelOffset + left);
+                String tright = tree.get(levelOffset + right);
+                tree.add(applySha256(tleft + tright));
             }
-            count = treeLayer.size();
-            previousTreeLayer = treeLayer;
+            levelOffset += levelSize;
         }
-
-        String merkleRoot = (treeLayer.size() == 1) ? treeLayer.get(0) : "";
-        return merkleRoot;
+        return tree.get(tree.size()-1);
     }
     
     // Check a string is blank

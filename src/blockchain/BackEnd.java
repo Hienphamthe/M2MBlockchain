@@ -35,7 +35,7 @@ import p2p.RpcThread;
  */
 public class BackEnd {
     // <editor-fold defaultstate="collapsed" desc="Declaration">
-    private static final Logger LOGGER = LoggerFactory.getLogger(NodeMain.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     // Create a local blockchain
     public static List<Block> blockChain = new ArrayList<Block>();
     // Create genesis transaction for genesis block 
@@ -86,6 +86,7 @@ public class BackEnd {
         */
         localSocketDirectory = localHost+"@"+localPort;
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
+
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             
         // no previous blockchain currently exists and could not find bootstrap node, create genesis block 
         if (!peerFile.exists() && !dataFile.exists()) {
@@ -94,36 +95,36 @@ public class BackEnd {
             FileUtils.writeStringToFile(dataFile,gson.toJson(genesisBlock), StandardCharsets.UTF_8,true);
             LOGGER.info("Empty peerFile. Creating new one ...");                
             FileUtils.writeStringToFile(peerFile, localHost+":"+localPort,StandardCharsets.UTF_8,true);
-        }else if (peerFile.exists() && !dataFile.exists()){
-            /*
-            2 function: 
-            Filter out the local socket on the file to form a peersListMainThread list
-            If local socket does not exist in the existing list, add the socket to it
-            */
-            LOGGER.info("PeerFile exists. Setting connection to each peers on the list ...");
-            boolean isLocalSocket = false;
-            for (String peer : FileUtils.readLines(peerFile,StandardCharsets.UTF_8)) {
-                String[] addr = peer.split(":");
-                //Jump to next peer, if the current is local                
-                if(StringUtil.isLocal(addr[0])&&String.valueOf(localPort).equals(addr[1])){
-                    isLocalSocket = true;
-//                    LOGGER.info("1 same host redundancy. Excluded!");
-                    continue;
+        } else {
+            if (peerFile.exists()){
+                /*
+                2 function: 
+                Filter out the local socket on the file to form a peersListMainThread list
+                If local socket does not exist in the existing list, add the socket to it
+                */
+                LOGGER.info("PeerFile exists. Setting connection to each peers on the list ...");
+                boolean isLocalSocket = false;
+                for (String peer : FileUtils.readLines(peerFile,StandardCharsets.UTF_8)) {
+                    String[] addr = peer.split(":");
+                    //Jump to next peer, if the current is local                
+                    if(StringUtil.isLocal(addr[0])&&String.valueOf(localPort).equals(addr[1])){
+                        isLocalSocket = true;
+    //                    LOGGER.info("1 same host redundancy. Excluded!");
+                        continue;
+                    }
+                    peersListMainThread.add(peer);
+                    peerNetwork.connect(addr[0], Integer.parseInt(addr[1]));                
                 }
-                peersListMainThread.add(peer);
-                peerNetwork.connect(addr[0], Integer.parseInt(addr[1]));                
+                String localSocket = localHost+":"+localPort;
+                if (!isLocalSocket) FileUtils.writeStringToFile(peerFile, "\r\n"+localSocket,StandardCharsets.UTF_8,true);
             }
-            String localSocket = localHost+":"+localPort;
-            if (!isLocalSocket) {FileUtils.writeStringToFile(peerFile, "\r\n"+localSocket,StandardCharsets.UTF_8,true);}
-        }
-        else if (dataFile.exists()){ // currently have blockchain, read each block to list, also add to txMap list for lookup
-            for(String line:FileUtils.readLines(dataFile, StandardCharsets.UTF_8)){
-                blockChain.add(gson.fromJson(line, Block.class));
-                TxMap.addAll(gson.fromJson(line, Block.class).transactions);
+            if (dataFile.exists()){ 
+                LOGGER.info("DataFile exists. Acquiring local local blockchain database ...");
+                for(String line:FileUtils.readLines(dataFile, StandardCharsets.UTF_8)){
+                    blockChain.add(gson.fromJson(line, Block.class));
+                    TxMap.addAll(gson.fromJson(line, Block.class).transactions);
+                }
             }
-            int initBestHeight = blockChain.size();
-            peerNetwork.broadcast("VERSION "+initBestHeight);
-
         }
         // </editor-fold>
                
@@ -142,13 +143,12 @@ public class BackEnd {
 
         
         TimeUnit.MILLISECONDS.sleep(500);
-        LOGGER.info("P2P communication!");
+        LOGGER.info("P2P communication!\n");
         // ********************************
         // Broadcast asking neighbors for genesis block
         // ********************************         
-        if (blockChain.isEmpty()) {
-            peerNetwork.broadcast("VERSION "+0);
-        }
+        if (blockChain.isEmpty()) peerNetwork.broadcast("VERSION "+0);
+        else peerNetwork.broadcast("VERSION "+ blockChain.size());
         
             // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
         while (true) {

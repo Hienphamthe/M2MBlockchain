@@ -6,7 +6,7 @@
 package Utils;
 
 import blockchain.Block;
-import blockchain.NodeMain;
+import blockchain.Main;
 import blockchain.NodeWallet;
 import blockchain.Transaction;
 import com.google.gson.Gson; 
@@ -23,10 +23,12 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -34,26 +36,27 @@ import java.util.stream.Collectors;
 import org.json.simple.parser.ParseException;
 
 public class testcase {
-    public static void main(String[] args) {
-//        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, NoSuchProviderException {
+Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 //        NodeWallet test = new NodeWallet();
 //        ECPublicKey publicKey = (ECPublicKey) test.publicKey;
 //        System.out.println(encodeECPublicKey(publicKey).length);
 //        System.out.println(test.publicKey.getEncoded().length);
-//                                    for(Object x : NodeMain.TxMap) {
-//                                    Class<?> clazz = x.getClass();
-//                                    Field field;
-//                                    try {
-//                                        field = clazz.getField("transactionId"); //Note, this can throw an exception if the field doesn't exist.
-//                                        Object fieldValue = field.get(x);
-//                                    } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {
-//                                        java.util.logging.Logger.getLogger(NodeMain.class.getName()).log(Level.SEVERE, null, ex);
-//                                    }
-//                                    
-//                                    List<Transaction> resultTx = NodeMain.TxMap.stream()
-//                                    .filter(a -> Objects.equals(a.getHash(), "303379aeb5006bda33d477a512a214737befbd369b64e1566f41f519d5ccf38d"))
-//                                    .collect(Collectors.toList());  
-//                                }
+//                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA","BC");
+kpg.initialize(new ECGenParameterSpec("prime192v1"), SecureRandom.getInstance("SHA1PRNG"));
+KeyPair keyPair = kpg.generateKeyPair();
+ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
+ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
+byte[] privateKeyS = privateKey.getS().toByteArray();
+byte[] publicKeyX = publicKey.getW().getAffineX().toByteArray();
+byte[] publicKeyY = publicKey.getW().getAffineY().toByteArray();
+String encodedPrivateKey = Base64.getEncoder().encodeToString(privateKeyS);
+String encodedPublicKeyX = Base64.getEncoder().encodeToString(publicKeyX);
+String encodedPublicKeyY = Base64.getEncoder().encodeToString(publicKeyY);
+System.out.println("encodedPrivateKey = " + encodedPrivateKey);
+System.out.println("encodedPublicKeyX = " + encodedPublicKeyX);
+System.out.println("encodedPublicKeyY = " + encodedPublicKeyY);
     }
 //    public static void main(String[] args) throws ParseException, NoSuchAlgorithmException, NoSuchProviderException, InvalidAlgorithmParameterException, InvalidKeySpecException { 
 //        final Gson gson = new GsonBuilder().create();

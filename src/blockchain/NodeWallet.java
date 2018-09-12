@@ -1,18 +1,17 @@
 package blockchain;
 import Utils.StringUtil;
 import java.security.*;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 public final class NodeWallet {
     // not 49byte eckey, rather 75byte key
-    public transient PrivateKey privateKey;
-    public transient PublicKey publicKey;
+    public transient ECPrivateKey privateKey;
+    public transient ECPublicKey publicKey;
     public String creator;
     public String publickey;
     public String privatekey;
@@ -40,8 +39,8 @@ public final class NodeWallet {
             keyGen.initialize(ecSpec, random); //256 
             KeyPair keyPair = keyGen.generateKeyPair();
             // Set the public and private keys from the keyPair
-            privateKey = keyPair.getPrivate();
-            publicKey = keyPair.getPublic();
+            privateKey = (ECPrivateKey) keyPair.getPrivate();
+            publicKey = (ECPublicKey) keyPair.getPublic();
 
         }catch(InvalidAlgorithmParameterException | NoSuchAlgorithmException | NoSuchProviderException e) {
             throw new RuntimeException(e);
@@ -63,8 +62,8 @@ public final class NodeWallet {
         byte[] privEncoded = StringUtil.getKeyByteFromString(privatekey);
         X509EncodedKeySpec  x509EncodedKeySpec = new X509EncodedKeySpec (pubEncoded);
         PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(privEncoded);
-        PublicKey publicKeyCheck = ecKeyFac.generatePublic(x509EncodedKeySpec);
-        PrivateKey privateKeyCheck = ecKeyFac.generatePrivate(pkcs8EncodedKeySpec);
+        ECPublicKey publicKeyCheck = (ECPublicKey) ecKeyFac.generatePublic(x509EncodedKeySpec);
+        ECPrivateKey privateKeyCheck = (ECPrivateKey)ecKeyFac.generatePrivate(pkcs8EncodedKeySpec);
         
         if (StringUtil.verifyECDSASig(publicKeyCheck, "helloworld", StringUtil.applyECDSASig(privateKeyCheck,"helloworld"))){
             this.publicKey = publicKeyCheck;

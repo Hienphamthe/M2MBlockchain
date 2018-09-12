@@ -14,8 +14,8 @@ import org.slf4j.LoggerFactory;
  * Node controller (full blockchain, routing, wallet, miner/validator)
  * @author Student
  */
-public class NodeMain {
-    private static final Logger LOGGER = LoggerFactory.getLogger(NodeMain.class);
+public class Main {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.print("Start as: ");
