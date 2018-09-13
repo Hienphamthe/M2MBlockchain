@@ -9,6 +9,7 @@ import blockchain.Block;
 import blockchain.Main;
 import blockchain.NodeWallet;
 import blockchain.Transaction;
+import com.google.common.collect.Lists;
 import com.google.gson.Gson; 
 import com.google.gson.GsonBuilder; 
 import java.lang.reflect.Field;
@@ -28,7 +29,9 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -36,27 +39,40 @@ import java.util.stream.Collectors;
 import org.json.simple.parser.ParseException;
 
 public class testcase {
+    public static final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();     
+    
     public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, NoSuchProviderException {
-Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        List<String> listWithDuplicates = Lists.newArrayList("192.168.15.3:8015", "192.168.15.3:8016", "192.168.15.3:8015", "192.168.15.3:8015", "192.168.15.4:8015", "192.168.15.4:8016");
+//        listWithDuplicates.add("192.168.15.3:8016");
+        String s = "192.168.15.3:80115";
+        if (s.split(":").length==2 && listWithDuplicates.stream().anyMatch(x -> s.equalsIgnoreCase(x))) {
+            System.out.println(s);
+        }
+//Objects.equals(args, args);
+//        List<String> listWithoutDuplicates = new ArrayList<>(new HashSet<>(listWithDuplicates));
+//        System.out.println(prettyGson.toJson(listWithDuplicates));
+//        System.out.println(prettyGson.toJson(listWithoutDuplicates));
+    
+//Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 //        NodeWallet test = new NodeWallet();
 //        ECPublicKey publicKey = (ECPublicKey) test.publicKey;
 //        System.out.println(encodeECPublicKey(publicKey).length);
 //        System.out.println(test.publicKey.getEncoded().length);
 //                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA","BC");
-kpg.initialize(new ECGenParameterSpec("prime192v1"), SecureRandom.getInstance("SHA1PRNG"));
-KeyPair keyPair = kpg.generateKeyPair();
-ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
-ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
-byte[] privateKeyS = privateKey.getS().toByteArray();
-byte[] publicKeyX = publicKey.getW().getAffineX().toByteArray();
-byte[] publicKeyY = publicKey.getW().getAffineY().toByteArray();
-String encodedPrivateKey = Base64.getEncoder().encodeToString(privateKeyS);
-String encodedPublicKeyX = Base64.getEncoder().encodeToString(publicKeyX);
-String encodedPublicKeyY = Base64.getEncoder().encodeToString(publicKeyY);
-System.out.println("encodedPrivateKey = " + encodedPrivateKey);
-System.out.println("encodedPublicKeyX = " + encodedPublicKeyX);
-System.out.println("encodedPublicKeyY = " + encodedPublicKeyY);
+//KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA","BC");
+//kpg.initialize(new ECGenParameterSpec("prime192v1"), SecureRandom.getInstance("SHA1PRNG"));
+//KeyPair keyPair = kpg.generateKeyPair();
+//ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
+//ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
+//byte[] privateKeyS = privateKey.getS().toByteArray();
+//byte[] publicKeyX = publicKey.getW().getAffineX().toByteArray();
+//byte[] publicKeyY = publicKey.getW().getAffineY().toByteArray();
+//String encodedPrivateKey = Base64.getEncoder().encodeToString(privateKeyS);
+//String encodedPublicKeyX = Base64.getEncoder().encodeToString(publicKeyX);
+//String encodedPublicKeyY = Base64.getEncoder().encodeToString(publicKeyY);
+//System.out.println("encodedPrivateKey = " + encodedPrivateKey);
+//System.out.println("encodedPublicKeyX = " + encodedPublicKeyX);
+//System.out.println("encodedPublicKeyY = " + encodedPublicKeyY);
     }
 //    public static void main(String[] args) throws ParseException, NoSuchAlgorithmException, NoSuchProviderException, InvalidAlgorithmParameterException, InvalidKeySpecException { 
 //        final Gson gson = new GsonBuilder().create();

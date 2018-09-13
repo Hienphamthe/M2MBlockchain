@@ -1,12 +1,17 @@
 package blockchain;
 
 import Utils.StringUtil;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
+import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +21,7 @@ import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +48,7 @@ public class BackEnd {
     private Transaction genesisTransaction;
     // Miscellaneous variables 
     public static String localHost;
-    public static final int localPort = 8015;
+    public static int localPort = 8019;
     private static String localSocketDirectory;
     // Read list of known peers (List of IP addresses)
     private final File peerFile = new File("./peers.list");
@@ -50,8 +56,11 @@ public class BackEnd {
     private File dataFile;
     // Store wallet addresses
     private NodeWallet myNode = null;    
-    private final File addressFile = new File ("./addresses.list");
+    private final File addressFile = new File("./addresses.list");
     // Miscellaneous
+    private List<String> miningDuty = new ArrayList<>();
+    private List<String> fixedMiningDuty;
+    private final boolean isAutominingActivate = false; // Only works with VM
     public int bestHeight;
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
@@ -64,13 +73,14 @@ public class BackEnd {
         peersListMainThread = new ArrayList<>();
         
         // <editor-fold defaultstate="collapsed" desc="Acquire local IP address">
-        // Linux getIP
-//        localHost = new StringUtil().getIP("enp0s3");
-        // Windows getIP
-        String[] host = InetAddress.getLocalHost().toString().split("/");
+        if (isAutominingActivate) {
+            localHost = new StringUtil().getIP("enp0s3");
+        } else {
+            String[] host = InetAddress.getLocalHost().toString().split("/");
         localHost = host[1];
+        }
         // </editor-fold>
-
+        
         // <editor-fold defaultstate="collapsed" desc="Accepting other nodes && start RPC service">
         PeerNetwork peerNetwork = new PeerNetwork(localPort);
         peerNetwork.start(); 
@@ -85,6 +95,8 @@ public class BackEnd {
          * If exist, to do (explained below)
         */
         localSocketDirectory = localHost+"@"+localPort;
+        miningDuty.add(String.valueOf(localPort)); // linux VM
+        
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
 
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             
@@ -143,14 +155,17 @@ public class BackEnd {
 
         
         TimeUnit.MILLISECONDS.sleep(500);
+        long startTime = System.currentTimeMillis();
+        int toBlockNum =0;
         LOGGER.info("P2P communication!\n");
         // ********************************
-        // Broadcast asking neighbors for genesis block
+        // Broadcast asking neighbors for genesis block, broadcast duty task
         // ********************************         
         if (blockChain.isEmpty()) peerNetwork.broadcast("VERSION "+0);
         else peerNetwork.broadcast("VERSION "+ blockChain.size());
+        if (!miningDuty.isEmpty()) peerNetwork.broadcast("PING "+ gson.toJson(miningDuty));
         
-            // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
+        // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
         while (true) {
             // Write a file to the newly connected peer, and start the direct connection next time.
             for (String peer : peerNetwork.peersList) {
@@ -181,8 +196,7 @@ public class BackEnd {
                     String payload = flag >= 0 ? data.substring(flag + 1) : "";
                     if (StringUtil.isNotBlank(cmd)) {
                         if ("VERSION".equalsIgnoreCase(cmd)) {
-                            String[] parts = payload.split(" ");
-                            bestHeight = Integer.parseInt(parts[0]);
+                            bestHeight = Integer.parseInt(payload);
                             String response = "VERACK " + blockChain.size() + " " + blockChain.get(blockChain.size() - 1).getHash();
                             LOGGER.info("=> [p2p] RESPOND: " + response);
                             pt.peerWriter.write(response);
@@ -190,8 +204,18 @@ public class BackEnd {
                         else if ("VERACK".equalsIgnoreCase(cmd)) {
                             String[] parts = payload.split(" ");
                             bestHeight = Integer.parseInt(parts[0]);
-                        }
-                        else if ("GET_BLOCK".equalsIgnoreCase(cmd)) {
+                        } else if ("PING".equalsIgnoreCase(cmd)) {
+                            List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
+                            miningDuty.addAll(neighborDutyList);
+                            miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
+                            String response = "PONG "+ gson.toJson(miningDuty);
+                            LOGGER.info("=> [p2p] RESPOND: " + response);
+                            pt.peerWriter.write(response);
+                        } else if ("PONG".equalsIgnoreCase(cmd)) {
+                            List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
+                            miningDuty.addAll(neighborDutyList);
+                            miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
+                        } else if ("GET_BLOCK".equalsIgnoreCase(cmd)) {
                             Block block = blockChain.get(Integer.parseInt(payload));
                             if (block != null) {
                                 String response = "BLOCK " + gson.toJson(block);
@@ -209,17 +233,9 @@ public class BackEnd {
                                     TxMap.addAll(newBlock.transactions);
                                     LOGGER.info("Added block " + newBlock.getIndex() + " with hash: ["+ newBlock.getHash() + "]");
                                     // Remove already mined transaction
-                                    TXmempool = TXmempool.stream().filter(singleTx -> {
-                                            boolean result = true;
-                                            for (Transaction tempTx : newBlock.transactions) {                                                
-                                                if (singleTx.equals(tempTx)){
-                                                    result = false;
-                                                    break;
-                                                }
-                                            }
-                                            return result;
-                                        }).collect(Collectors.toList());
-                                    
+                                    TXmempool = TXmempool.stream()
+                                            .filter(singleTx -> !newBlock.transactions.stream().anyMatch(singleTx::equals))
+                                            .collect(Collectors.toList());
                                     if (newBlock.getIndex()==0){FileUtils.writeStringToFile(dataFile,gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
                                     else {FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);}
                                     peerNetwork.broadcast("BLOCK " + payload);
@@ -235,22 +251,57 @@ public class BackEnd {
                             } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
                                 ex.printStackTrace();
                             }
-                            if (newTransaction!=null && newTransaction.processTransaction()){
+                            if (newTransaction!=null 
+                                    && newTransaction.processTransaction() 
+                                    && !(TXmempool.stream().anyMatch(newTransaction::equals))
+                                    && !(TxMap.stream().anyMatch(newTransaction::equals))){
                                 TXmempool.add(newTransaction);                                
                                 LOGGER.info("Added transaction " + newTransaction.transactionId + " to mempool.");
+                                peerNetwork.broadcast("TRANSACTION " + payload);
                             }                                                                                        
                         }
                     }
-                }                    
+                }        
             }
             // </editor-fold>
             
             // <editor-fold defaultstate="collapsed" desc="Automation mining">
-            if (TXmempool.size()>=3){                
-                LOGGER.info("Auto mining with difficulty = 3");
-                String logger = MineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
-                LOGGER.info(logger);
+            // renew network list every 5sec
+            if ((System.currentTimeMillis()-startTime)/1000>10) {
+                    List<PeerThread> refresedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
+                    refresedList.forEach((temp)->{System.out.println(temp.getClientSocket());});
+                    refresedList.forEach((temp)->{miningDuty.add(temp.getClientSocket().g);});
+                    String pingpong = "PING "+ gson.toJson(miningDuty);
+                    peerNetwork.broadcast(pingpong);
+                    startTime = System.currentTimeMillis();
             }
+            
+            if (isAutominingActivate){
+                if ((System.currentTimeMillis()-startTime)/1000>10) {
+                    List<PeerThread> refresedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
+                    refresedList.forEach((temp)->{System.out.println(temp.getClientSocket());});
+                   
+                    refresedList.forEach((temp)->{miningDuty.add(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));});
+                    miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
+                    String pingpong = "PING "+ gson.toJson(miningDuty);
+                    peerNetwork.broadcast(pingpong);
+                    startTime = System.currentTimeMillis();
+                }
+
+                if (TXmempool.size()>=3){
+                    fixedMiningDuty = miningDuty;
+                    toBlockNum = (toBlockNum == 0) ? blockChain.size()+fixedMiningDuty.size():toBlockNum;
+                    for(int i=blockChain.size(); i<toBlockNum; i++){
+                        if (fixedMiningDuty.get(i).equalsIgnoreCase(localHost)){
+                            LOGGER.info("Auto mining with difficulty = 3");
+                            String logger = MineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
+                            LOGGER.info(logger);
+                        }
+                        toBlockNum = (i+1==toBlockNum) ? 0 : toBlockNum;
+                    }
+                }
+            }
+            
             // </editor-fold>
             
             // <editor-fold defaultstate="collapsed" desc="Compare block height, sync block">
@@ -328,18 +379,14 @@ public class BackEnd {
                             break;
                         case "filterblock":
                             if (parts.length==3){
-                                String fieldName = parts[1];
-                                String value = parts[2];
-                                List<Block> resultBlock = FilterBlock(fieldName, value);
+                                List<Block> resultBlock = FilterBlock(parts[1], parts[2]);
                                 th.res = resultBlock!=null ? prettyGson.toJson(resultBlock): "Block not found.";
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
                         case "filtertx":
                             if (parts.length==3){
-                                String fieldName = parts[1];
-                                String value = parts[2];
-                                List<Transaction> resultTx = FilterTx(fieldName, value);
+                                List<Transaction> resultTx = FilterTx(parts[1], parts[2]);
                                 th.res = resultTx!=null ? prettyGson.toJson(resultTx):"Transaction not found.";
                             } else {
                                 th.res = "Wrong syntax.";
@@ -348,11 +395,9 @@ public class BackEnd {
                             if (parts.length==2){
                                 try {
                                     int difficulty = Integer.parseInt(parts[1]);
-                                    if(TXmempool.isEmpty()){
-                                        th.res = "Block write failed! No Transaction existed!";
-                                    } else {
-                                        th.res = MineBlock(difficulty, peerNetwork) ? "Block write Success!" : "Invalid block";
-                                    }
+                                    th.res = (TXmempool.isEmpty()) ? 
+                                            "Block write failed! No Transaction existed!" :
+                                            MineBlock(difficulty, peerNetwork) ? "Block write Success!" : "Invalid block";
                                 } catch (NumberFormatException e) {
                                     th.res = "Syntax (no '<' or '>'): mine <difficulty> - mine a block with <difficulty>";
                                 }
@@ -415,13 +460,13 @@ public class BackEnd {
                 if (gson.fromJson(addr, NodeWallet.class).creator.equalsIgnoreCase(localSocketDirectory)){
                     isLocalSocket = true;
                     break;                 
-                }                                
+                }       
             }
             if (!isLocalSocket) {
                 newNode();
                 FileUtils.writeStringToFile(addressFile,"\r\n"+gson.toJson(myNode),StandardCharsets.UTF_8,true); 
                 result = true;
-            }            
+            }        
         }
         return result;
     }
@@ -506,18 +551,18 @@ public class BackEnd {
                 return null;
             } else {
                 resultBlock = blockChain.stream()
-                        .filter(singleBlock ->  {
-                            boolean result = false;
-                            for (Transaction temp : singleBlock.transactions) {
-                                for (Transaction temp2 : resultTx) {
-                                    if (temp.equals(temp2)) {
-                                       result = true;
-                                       break;
-                                    }
+                    .filter(singleBlock ->  {
+                        boolean result = false;
+                        for (Transaction temp : singleBlock.transactions) {
+                            for (Transaction temp2 : resultTx) {
+                                if (temp.equals(temp2)) {
+                                   result = true;
+                                   break;
                                 }
                             }
-                            return result;
-                        }).collect(Collectors.toList());
+                        }
+                        return result;
+                    }).collect(Collectors.toList());
                 return !resultBlock.isEmpty() ? resultBlock : null;
             }
         }

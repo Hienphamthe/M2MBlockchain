@@ -1,6 +1,7 @@
 package p2p;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -32,10 +33,7 @@ public class PeerWriter extends Thread {
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                 while (runFlag) {
                     if (!outputBuffer.isEmpty() && outputBuffer.get(0) != null) {
-                        for (String line : outputBuffer) {
-//                            LOGGER.info("Sending " +line + " to " +socket.getInetAddress()+ ":" +socket.getPort());
-                            out.println(line);
-                        }
+                        outputBuffer.forEach(out::println);
                         outputBuffer = new ArrayList<>();
                         outputBuffer.add(null);
                     }
@@ -43,7 +41,7 @@ public class PeerWriter extends Thread {
                     outputBuffer.add(null);
                     TimeUnit.MILLISECONDS.sleep(200);
                 }
-            } catch (Exception e) {
+            } catch (IOException | InterruptedException e) {
                 LOGGER.info("Peer " + socket.getInetAddress().getHostAddress()+":"+socket.getPort() + " disconnected."+e.getMessage()); 
             }
 	}
@@ -56,7 +54,7 @@ public class PeerWriter extends Thread {
 	public void write(String data) {
             if (!outputBuffer.isEmpty()) {
                 if (outputBuffer.get(0) == null) {
-                        outputBuffer.remove(0);
+                    outputBuffer.remove(0);
                 }
             }
             outputBuffer.add(data);

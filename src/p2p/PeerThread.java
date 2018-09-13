@@ -41,11 +41,15 @@ public class PeerThread extends Thread
     {
         if (peerWriter == null)
         {
-        	LOGGER.error("Couldn't send " + data + " when outputThread is null");
+            LOGGER.error("Couldn't send " + data + " when outputThread is null");
         }
         else
         {
             peerWriter.write(data);
         }
+    }
+    
+    public Socket getClientSocket(){
+        return clientSocket;
     }
 }

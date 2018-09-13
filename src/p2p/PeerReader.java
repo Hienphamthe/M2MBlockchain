@@ -1,6 +1,7 @@
 package p2p;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 public class PeerReader extends Thread {
     private static final Logger LOGGER = LoggerFactory.getLogger(PeerReader.class);	
     private Socket clientSocket;
+    public boolean isConnected = false;
 
     //Buffer
     private ArrayList<String> receivedData = new ArrayList<>();
@@ -28,6 +30,7 @@ public class PeerReader extends Thread {
      */
     public PeerReader(Socket socket) {
         this.clientSocket = socket;
+        isConnected = true;
     }
 
     @Override
@@ -39,8 +42,9 @@ public class PeerReader extends Thread {
             while ((input = in.readLine()) != null) {
                 receivedData.add(input);
             }
-        } catch (Exception e) {
-        	LOGGER.error("Peer " + clientSocket.getInetAddress().getHostAddress()+":"+clientSocket.getPort() + " disconnected." +e.getMessage());
+        } catch (IOException e) {
+            LOGGER.error("Peer " + clientSocket.getInetAddress().getHostAddress()+":"+clientSocket.getPort() + " disconnected." +e.getMessage());
+            isConnected = false;
         }
     }
 

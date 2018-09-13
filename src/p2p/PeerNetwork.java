@@ -24,7 +24,8 @@ public class PeerNetwork extends Thread {
     
     public List<PeerThread> peerThreads;
     public List<String> peersList;
-
+    public ServerSocket listenSocket;
+            
     /**
      * Settings with port
      * @param port
@@ -45,7 +46,7 @@ public class PeerNetwork extends Thread {
             //PeerServerThread server = new PeerServerThread();
             //server.StartServer(listeningPort); 
             LOGGER.info("Node started at localport: "+listeningPort);
-            ServerSocket listenSocket = new ServerSocket(listeningPort);            
+            listenSocket = new ServerSocket(listeningPort);  
             while (runFlag) 
             {
                 Socket clientSocket = listenSocket.accept();
@@ -88,10 +89,10 @@ public class PeerNetwork extends Thread {
      * @param data String to broadcast to peers
      */
     public void broadcast(String data) {
-        for (PeerThread pt: peerThreads) {
+        if (!peerThreads.isEmpty()) {
             LOGGER.info("=> [p2p] BROADCAST: " + data);
-            if( pt!=null){
-            	pt.send(data);
+            for (PeerThread pt: peerThreads) {
+                if(pt!=null) pt.send(data);
             }
         }
     }
