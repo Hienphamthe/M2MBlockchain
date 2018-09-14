@@ -1,6 +1,6 @@
 package blockchain;
 
-import Utils.StringUtil;
+import Utils.*;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ public class BackEnd {
     private Transaction genesisTransaction;
     // Miscellaneous variables 
     public static String localHost;
-    public static int localPort = 8019;
+    public static int localPort = 8017;
     private static String localSocketDirectory;
     // Read list of known peers (List of IP addresses)
     private final File peerFile = new File("./peers.list");
@@ -60,7 +61,7 @@ public class BackEnd {
     // Miscellaneous
     private List<String> miningDuty = new ArrayList<>();
     private List<String> fixedMiningDuty;
-    private final boolean isAutominingActivate = false; // Only works with VM
+    private final boolean isAutominingActivate = true; // Only works with VM
     public int bestHeight;
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
@@ -77,7 +78,7 @@ public class BackEnd {
             localHost = new StringUtil().getIP("enp0s3");
         } else {
             String[] host = InetAddress.getLocalHost().toString().split("/");
-        localHost = host[1];
+            localHost = host[1];
         }
         // </editor-fold>
         
@@ -95,7 +96,7 @@ public class BackEnd {
          * If exist, to do (explained below)
         */
         localSocketDirectory = localHost+"@"+localPort;
-        miningDuty.add(String.valueOf(localPort)); // linux VM
+        miningDuty.add(localHost); // linux VM
         
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
 
@@ -156,7 +157,9 @@ public class BackEnd {
         
         TimeUnit.MILLISECONDS.sleep(500);
         long startTime = System.currentTimeMillis();
-        int toBlockNum =0;
+        int toBlockNum, fromBlockNum;
+        toBlockNum = fromBlockNum =0;
+        boolean startMining = false;
         LOGGER.info("P2P communication!\n");
         // ********************************
         // Broadcast asking neighbors for genesis block, broadcast duty task
@@ -165,8 +168,9 @@ public class BackEnd {
         else peerNetwork.broadcast("VERSION "+ blockChain.size());
         if (!miningDuty.isEmpty()) peerNetwork.broadcast("PING "+ gson.toJson(miningDuty));
         
-        // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
+        
         while (true) {
+            // <editor-fold defaultstate="collapsed" desc="Handling P2p communication">
             // Write a file to the newly connected peer, and start the direct connection next time.
             for (String peer : peerNetwork.peersList) {
                 if (!peersListMainThread.contains(peer)) {
@@ -205,16 +209,13 @@ public class BackEnd {
                             String[] parts = payload.split(" ");
                             bestHeight = Integer.parseInt(parts[0]);
                         } else if ("PING".equalsIgnoreCase(cmd)) {
-                            List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
-                            miningDuty.addAll(neighborDutyList);
-                            miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
+                            ProceedPingPong(payload);
                             String response = "PONG "+ gson.toJson(miningDuty);
                             LOGGER.info("=> [p2p] RESPOND: " + response);
                             pt.peerWriter.write(response);
+                            
                         } else if ("PONG".equalsIgnoreCase(cmd)) {
-                            List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
-                            miningDuty.addAll(neighborDutyList);
-                            miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
+                            ProceedPingPong(payload);
                         } else if ("GET_BLOCK".equalsIgnoreCase(cmd)) {
                             Block block = blockChain.get(Integer.parseInt(payload));
                             if (block != null) {
@@ -263,45 +264,6 @@ public class BackEnd {
                     }
                 }        
             }
-            // </editor-fold>
-            
-            // <editor-fold defaultstate="collapsed" desc="Automation mining">
-            // renew network list every 5sec
-            if ((System.currentTimeMillis()-startTime)/1000>10) {
-                    List<PeerThread> refresedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
-                    refresedList.forEach((temp)->{System.out.println(temp.getClientSocket());});
-                    refresedList.forEach((temp)->{miningDuty.add(temp.getClientSocket().g);});
-                    String pingpong = "PING "+ gson.toJson(miningDuty);
-                    peerNetwork.broadcast(pingpong);
-                    startTime = System.currentTimeMillis();
-            }
-            
-            if (isAutominingActivate){
-                if ((System.currentTimeMillis()-startTime)/1000>10) {
-                    List<PeerThread> refresedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
-                    refresedList.forEach((temp)->{System.out.println(temp.getClientSocket());});
-                   
-                    refresedList.forEach((temp)->{miningDuty.add(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));});
-                    miningDuty = new ArrayList<>(new HashSet<>(miningDuty));
-                    String pingpong = "PING "+ gson.toJson(miningDuty);
-                    peerNetwork.broadcast(pingpong);
-                    startTime = System.currentTimeMillis();
-                }
-
-                if (TXmempool.size()>=3){
-                    fixedMiningDuty = miningDuty;
-                    toBlockNum = (toBlockNum == 0) ? blockChain.size()+fixedMiningDuty.size():toBlockNum;
-                    for(int i=blockChain.size(); i<toBlockNum; i++){
-                        if (fixedMiningDuty.get(i).equalsIgnoreCase(localHost)){
-                            LOGGER.info("Auto mining with difficulty = 3");
-                            String logger = MineBlock(3, peerNetwork) ? "Block write Success!" : "Invalid block.";
-                            LOGGER.info(logger);
-                        }
-                        toBlockNum = (i+1==toBlockNum) ? 0 : toBlockNum;
-                    }
-                }
-            }
-            
             // </editor-fold>
             
             // <editor-fold defaultstate="collapsed" desc="Compare block height, sync block">
@@ -411,6 +373,103 @@ public class BackEnd {
                 }
             }        
         // </editor-fold>
+        
+        // <editor-fold defaultstate="collapsed" desc="Automation mining">
+            // renew network list every 10sec
+//            if ((System.currentTimeMillis()-startTime)/1000>10) {
+//                try {
+//                    System.out.println("start");
+//                    List<PeerThread> refreshedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
+//                    System.out.println(refreshedList.size());
+//                    List<String> refreshedListPort = new ArrayList<>();
+//                    refreshedList.forEach((temp)->{
+//                        System.out.println(temp.getClientSocket().getPort());
+//                        refreshedListPort.add(String.valueOf(temp.getClientSocket().getPort()));
+//                    });
+//                    miningDuty.retainAll(refreshedListPort);
+//                    miningDuty.add(String.valueOf(localPort));
+//                    miningDuty = IPSort.IPSort(miningDuty);
+//                    System.out.println(miningDuty.size());
+//                    miningDuty.forEach(System.out::println);                
+//                    String pingpong = "PING "+ gson.toJson(miningDuty);
+//                    peerNetwork.broadcast(pingpong);
+//                    startTime = System.currentTimeMillis();
+//                } catch (Exception ex) {
+//                    LOGGER.error("Error sorting miningDuty list");
+//                    ex.printStackTrace();
+//                }
+//            }
+            
+            if (isAutominingActivate){
+                int currentBlockHeight = blockChain.size();
+                if ((System.currentTimeMillis()-startTime)/1000>10) {
+                    try {
+//                        System.out.println("start");
+                        List<PeerThread> refreshedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
+//                        System.out.println(refreshedList.size());
+
+                        List<String> refreshedListAddr = new ArrayList<>();
+                        refreshedList.forEach((temp)->{
+//                            System.out.println(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));
+                            refreshedListAddr.add(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));
+                        });
+                        miningDuty.retainAll(refreshedListAddr);
+                        miningDuty.add(String.valueOf(localHost));
+                        miningDuty = IPSort.IPSort(miningDuty);
+//                        System.out.println(miningDuty.size());
+//                        miningDuty.forEach(System.out::println);                
+                        String pingpong = "PING "+ gson.toJson(miningDuty);
+                        peerNetwork.broadcast(pingpong);
+                        currentBlockHeight = blockChain.size(); // block height at the moment fixedDutyTask is created
+                        startTime = System.currentTimeMillis();
+                    } catch (Exception ex) {
+                        LOGGER.error("Error sorting miningDuty list");
+                        ex.printStackTrace();
+                    }       
+                }
+                if (blockChain.size()>currentBlockHeight) {
+                    try {
+                        fixedMiningDuty = IPSort.IPSort(miningDuty);
+                    } catch (Exception ex) {
+                        LOGGER.error("Error sorting miningDuty list");
+                        ex.printStackTrace();
+                    }
+                }
+                if (TXmempool.size()>=1) {
+                    // reset mining duty list
+                    if (toBlockNum == 0) {
+                        try {
+                            fixedMiningDuty = IPSort.IPSort(miningDuty);
+                            fromBlockNum = blockChain.size();
+                            toBlockNum = fromBlockNum+fixedMiningDuty.size();
+                        } catch (Exception ex) {
+                            LOGGER.error("Error sorting miningDuty list");
+                            ex.printStackTrace();
+                        }
+                    }
+                    int i = blockChain.size() - fromBlockNum;
+                    System.out.println("fromBlockNum "+fromBlockNum);
+                    System.out.println("toBlockNum "+toBlockNum);
+                    System.out.println("fixedMiningDuty.size() "+fixedMiningDuty.size());
+                    System.out.println("i "+i);
+                    System.out.println(fixedMiningDuty.get(i));
+                    System.out.println(fixedMiningDuty);
+                    boolean myRole = false;
+                    if (fixedMiningDuty.get(i).equalsIgnoreCase(localHost)){
+                            int previousIndex = blockChain.get(blockChain.size() - 1).getIndex();
+                            LOGGER.info("Auto mining with difficulty = 3");
+                            String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
+                            LOGGER.info(logger);
+                            myRole = true;
+                            while (blockChain.get(blockChain.size() - 1).getIndex()!=previousIndex+1){TimeUnit.MILLISECONDS.sleep(100);}
+                    }
+                    System.out.println("blockChain.size() "+blockChain.size());
+                    toBlockNum = ((i==fixedMiningDuty.size()-1)&&(blockChain.size()==toBlockNum)) ? 0 : ((i==fixedMiningDuty.size()-1)&&(!myRole)) ? 0 : toBlockNum;
+                    System.out.println("toBlockNum "+toBlockNum);
+                }
+            }
+            // </editor-fold>
+            
         TimeUnit.MILLISECONDS.sleep(500);
         } 
         // </editor-fold>
@@ -510,7 +569,7 @@ public class BackEnd {
                 TxMap.addAll(TXmempool);                                        
                 TXmempool.clear();
             } catch (IOException ex) {
-                java.util.logging.Logger.getLogger(BackEnd.class.getName()).log(Level.SEVERE, null, ex);
+                LOGGER.error("Error while writing to dataFile.");
             }
         } else {
             status = false;
@@ -568,5 +627,16 @@ public class BackEnd {
         }
     }
     
+    private void ProceedPingPong(String payload) {
+        try {
+            List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
+            miningDuty.addAll(neighborDutyList);
+            miningDuty = StringUtil.removeDuplicate(miningDuty);
+            miningDuty = IPSort.IPSort(miningDuty);
+        } catch (Exception ex) {
+            LOGGER.error("Error sorting miningDuty list");
+            ex.printStackTrace();
+        }
+    }   
     // </editor-fold>
 }

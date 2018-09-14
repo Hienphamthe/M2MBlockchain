@@ -8,7 +8,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List; 
+import java.util.Set;
 
 public class StringUtil {
     private NetworkInterface ni;
@@ -170,4 +173,16 @@ public class StringUtil {
     public static boolean isNotBlank(final CharSequence cs) {
         return !isBlank(cs);
     }   
+    
+    @SuppressWarnings("unchecked")
+    public static <T> List<T> removeDuplicate(List <T> list) {
+        Set <T> set = new HashSet <>();
+        List <T> newList = new ArrayList <>();
+        list.stream().filter((element) -> (set.add((T) element))).forEachOrdered((element) -> {
+            newList.add((T) element);
+            });
+        list.clear();
+        list.addAll(newList);
+        return list;
+    }
 }

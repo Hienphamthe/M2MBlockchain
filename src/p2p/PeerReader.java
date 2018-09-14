@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +44,7 @@ public class PeerReader extends Thread {
             while ((input = in.readLine()) != null) {
                 receivedData.add(input);
             }
+            isConnected = false;
         } catch (IOException e) {
             LOGGER.error("Peer " + clientSocket.getInetAddress().getHostAddress()+":"+clientSocket.getPort() + " disconnected." +e.getMessage());
             isConnected = false;
