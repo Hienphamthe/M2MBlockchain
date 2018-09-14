@@ -159,7 +159,7 @@ public class BackEnd {
         long startTime = System.currentTimeMillis();
         int toBlockNum, fromBlockNum;
         toBlockNum = fromBlockNum =0;
-        boolean startMining = false;
+        boolean lockedDutyList = false;
         LOGGER.info("P2P communication!\n");
         // ********************************
         // Broadcast asking neighbors for genesis block, broadcast duty task
@@ -427,13 +427,22 @@ public class BackEnd {
                         ex.printStackTrace();
                     }       
                 }
-                if (blockChain.size()>currentBlockHeight) {
-                    try {
-                        fixedMiningDuty = IPSort.IPSort(miningDuty);
-                    } catch (Exception ex) {
-                        LOGGER.error("Error sorting miningDuty list");
-                        ex.printStackTrace();
+                if ((blockChain.size()>currentBlockHeight)||(TXmempool.size()>=1)) {
+                    if (!lockedDutyList){
+                        try {
+                            fixedMiningDuty = IPSort.IPSort(miningDuty);
+                            for (int i=0;i<fixedMiningDuty.size();i++){
+                                fixedMiningDuty.set(i, fixedMiningDuty.get(i)+":"/*so thu tu block phai lam*/);
+                            }
+                            for (String line : fixedMiningDuty) {
+                                
+                            }
+                        } catch (Exception ex) {
+                            LOGGER.error("Error sorting miningDuty list");
+                            ex.printStackTrace();
+                        }
                     }
+                    
                 }
                 if (TXmempool.size()>=1) {
                     // reset mining duty list
