@@ -264,19 +264,7 @@ public class BackEnd {
                     }
                 }        
             }
-            // </editor-fold>
-            
-            // <editor-fold defaultstate="collapsed" desc="Compare block height, sync block">
-            int localHeight = blockChain.size();
-            if (bestHeight > localHeight) {
-                LOGGER.info("Local chain height: " + localHeight+" Best chain Height: " + bestHeight);
-                TimeUnit.MILLISECONDS.sleep(300);
-                for (int i = localHeight; i < bestHeight; i++) {
-                    LOGGER.info("=> [p2p] COMMAND: " + "GET_BLOCK " + i);
-                    peerNetwork.broadcast("GET_BLOCK " + i);
-                }
-            }
-            // </editor-fold>
+            // </editor-fold>            
             
             // <editor-fold defaultstate="collapsed" desc="Handling RPC communication">
             for (RpcThread th:rpcAgent.rpcThreads) {
@@ -372,9 +360,9 @@ public class BackEnd {
                     }
                 }
             }        
-        // </editor-fold>
+            // </editor-fold>
         
-        // <editor-fold defaultstate="collapsed" desc="Automation mining">
+            // <editor-fold defaultstate="collapsed" desc="Automation mining">
             // renew network list every 10sec
 //            if ((System.currentTimeMillis()-startTime)/1000>10) {
 //                try {
@@ -399,9 +387,9 @@ public class BackEnd {
 //                    ex.printStackTrace();
 //                }
 //            }
-            
+            int localHeight = blockChain.size();
             if (isAutominingActivate){
-                int currentBlockHeight = blockChain.size();
+                // refresh mining duty list after 10 seconds
                 if ((System.currentTimeMillis()-startTime)/1000>10) {
                     try {
 //                        System.out.println("start");
@@ -420,43 +408,26 @@ public class BackEnd {
 //                        miningDuty.forEach(System.out::println);                
                         String pingpong = "PING "+ gson.toJson(miningDuty);
                         peerNetwork.broadcast(pingpong);
-                        currentBlockHeight = blockChain.size(); // block height at the moment fixedDutyTask is created
                         startTime = System.currentTimeMillis();
                     } catch (Exception ex) {
                         LOGGER.error("Error sorting miningDuty list");
                         ex.printStackTrace();
                     }       
                 }
-                if ((blockChain.size()>currentBlockHeight)||(TXmempool.size()>=1)) {
-                    if (!lockedDutyList){
-                        try {
-                            fixedMiningDuty = IPSort.IPSort(miningDuty);
-                            for (int i=0;i<fixedMiningDuty.size();i++){
-                                fixedMiningDuty.set(i, fixedMiningDuty.get(i)+":"/*so thu tu block phai lam*/);
-                            }
-                            for (String line : fixedMiningDuty) {
-                                
-                            }
-                        } catch (Exception ex) {
-                            LOGGER.error("Error sorting miningDuty list");
-                            ex.printStackTrace();
-                        }
-                    }
-                    
-                }
-                if (TXmempool.size()>=1) {
+
+                if ((bestHeight > localHeight)||(TXmempool.size()>=1)) {
                     // reset mining duty list
                     if (toBlockNum == 0) {
                         try {
                             fixedMiningDuty = IPSort.IPSort(miningDuty);
-                            fromBlockNum = blockChain.size();
+                            fromBlockNum = (bestHeight <= localHeight) ? blockChain.size() : blockChain.size()-(bestHeight-localHeight);
                             toBlockNum = fromBlockNum+fixedMiningDuty.size();
                         } catch (Exception ex) {
                             LOGGER.error("Error sorting miningDuty list");
                             ex.printStackTrace();
                         }
                     }
-                    int i = blockChain.size() - fromBlockNum;
+                    int i = (bestHeight <= localHeight) ? (blockChain.size() - fromBlockNum) : (bestHeight - fromBlockNum);
                     System.out.println("fromBlockNum "+fromBlockNum);
                     System.out.println("toBlockNum "+toBlockNum);
                     System.out.println("fixedMiningDuty.size() "+fixedMiningDuty.size());
@@ -475,6 +446,17 @@ public class BackEnd {
                     System.out.println("blockChain.size() "+blockChain.size());
                     toBlockNum = ((i==fixedMiningDuty.size()-1)&&(blockChain.size()==toBlockNum)) ? 0 : ((i==fixedMiningDuty.size()-1)&&(!myRole)) ? 0 : toBlockNum;
                     System.out.println("toBlockNum "+toBlockNum);
+                }
+            }
+            // </editor-fold>
+            
+            // <editor-fold defaultstate="collapsed" desc="Compare block height, sync block">
+            if (bestHeight > localHeight) {
+                LOGGER.info("Local chain height: " + localHeight+" Best chain Height: " + bestHeight);
+                TimeUnit.MILLISECONDS.sleep(300);
+                for (int i = localHeight; i < bestHeight; i++) {
+                    LOGGER.info("=> [p2p] COMMAND: " + "GET_BLOCK " + i);
+                    peerNetwork.broadcast("GET_BLOCK " + i);
                 }
             }
             // </editor-fold>

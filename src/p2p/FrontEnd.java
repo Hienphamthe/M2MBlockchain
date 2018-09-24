@@ -20,7 +20,7 @@ public class FrontEnd {
 
         Thread chat_client_writer = new ChatWriter(sock_pw, con_br);
         chat_client_writer.start();
-        
+
         String s;
         while((s = sock_br.readLine()) != null)
         {
