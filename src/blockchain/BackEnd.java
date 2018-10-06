@@ -1,9 +1,6 @@
 package blockchain;
 
 import Utils.*;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Collections2;
-import com.google.common.collect.Lists;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -11,7 +8,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -21,13 +17,10 @@ import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,8 +54,11 @@ public class BackEnd {
     // Miscellaneous
     private List<String> miningDuty = new ArrayList<>();
     private List<String> fixedMiningDuty;
-    private final boolean isAutominingActivate = true; // Only works with VM
+    private boolean isAutoSelectiveMiningActivate = false; // Only works with VM
+    boolean isAutoMiningActivate = true;
     public int bestHeight;
+    private boolean receivednewBLOCK;
+    private boolean isRunningDuty;
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
     public  List<Transaction> TxMap = new ArrayList<>(); 
@@ -74,7 +70,7 @@ public class BackEnd {
         peersListMainThread = new ArrayList<>();
         
         // <editor-fold defaultstate="collapsed" desc="Acquire local IP address">
-        if (isAutominingActivate) {
+        if (isAutoSelectiveMiningActivate || isAutoMiningActivate) {
             localHost = new StringUtil().getIP("enp0s3");
         } else {
             String[] host = InetAddress.getLocalHost().toString().split("/");
@@ -96,7 +92,6 @@ public class BackEnd {
          * If exist, to do (explained below)
         */
         localSocketDirectory = localHost+"@"+localPort;
-        miningDuty.add(localHost); // linux VM
         
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
 
@@ -151,7 +146,7 @@ public class BackEnd {
         // <editor-fold defaultstate="collapsed" desc="P2p communication">
         /**
          * P2p communication
-         * Execute each 2000ms period
+         * Execute each 500ms period
          */
 
         
@@ -159,14 +154,14 @@ public class BackEnd {
         long startTime = System.currentTimeMillis();
         int toBlockNum, fromBlockNum;
         toBlockNum = fromBlockNum =0;
-        boolean lockedDutyList = false;
+
         LOGGER.info("P2P communication!\n");
         // ********************************
         // Broadcast asking neighbors for genesis block, broadcast duty task
         // ********************************         
         if (blockChain.isEmpty()) peerNetwork.broadcast("VERSION "+0);
         else peerNetwork.broadcast("VERSION "+ blockChain.size());
-        if (!miningDuty.isEmpty()) peerNetwork.broadcast("PING "+ gson.toJson(miningDuty));
+//        if (!miningDuty.isEmpty()) peerNetwork.broadcast("PING "+ gson.toJson(miningDuty));
         
         
         while (true) {
@@ -208,14 +203,14 @@ public class BackEnd {
                         else if ("VERACK".equalsIgnoreCase(cmd)) {
                             String[] parts = payload.split(" ");
                             bestHeight = Integer.parseInt(parts[0]);
-                        } else if ("PING".equalsIgnoreCase(cmd)) {
-                            ProceedPingPong(payload);
-                            String response = "PONG "+ gson.toJson(miningDuty);
-                            LOGGER.info("=> [p2p] RESPOND: " + response);
-                            pt.peerWriter.write(response);
-                            
-                        } else if ("PONG".equalsIgnoreCase(cmd)) {
-                            ProceedPingPong(payload);
+//                        } else if ("PING".equalsIgnoreCase(cmd)) {
+//                            ProceedPingPong(payload);
+//                            String response = "PONG "+ gson.toJson(miningDuty);
+//                            LOGGER.info("=> [p2p] RESPOND: " + response);
+//                            pt.peerWriter.write(response);
+//                            
+//                        } else if ("PONG".equalsIgnoreCase(cmd)) {
+//                            ProceedPingPong(payload);
                         } else if ("GET_BLOCK".equalsIgnoreCase(cmd)) {
                             Block block = blockChain.get(Integer.parseInt(payload));
                             if (block != null) {
@@ -226,11 +221,12 @@ public class BackEnd {
                         } else if ("BLOCK".equalsIgnoreCase(cmd)) {
                             //Store the block given by the other party in the chain
                             Block newBlock = gson.fromJson(payload, Block.class);                       
-                            if (!blockChain.contains(newBlock)) {
+                            if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
                                     blockChain.add(newBlock);
+                                    receivednewBLOCK = isRunningDuty ? true : false;
                                     TxMap.addAll(newBlock.transactions);
                                     LOGGER.info("Added block " + newBlock.getIndex() + " with hash: ["+ newBlock.getHash() + "]");
                                     // Remove already mined transaction
@@ -289,14 +285,20 @@ public class BackEnd {
                             break;
                         case "unlock":
                             if (parts.length==3){
-                                try {
+                                if (myNode!=null){
+                                    th.res = "Wallet is existing. Address: " +myNode.publickey;
+                                } else {
                                     String publicKey = parts[1];
                                     String privateKey = parts[2];
                                     myNode = new NodeWallet(publicKey, privateKey);
-                                    th.res = (myNode==null) ? "Wrong authenication!" : "Address :"+myNode.publickey+" is validated!";
-                                } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                                    ex.printStackTrace();
+                                    if (!myNode.unlockWallet()) {
+                                        th.res = "Wrong authenication!";
+                                        myNode = null;
+                                    } else {
+                                        th.res = "Address :"+myNode.publickey+" is validated!";
+                                    }                                    
                                 }
+                                
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
@@ -342,6 +344,14 @@ public class BackEnd {
                                 th.res = "Wrong syntax.";
                             }   break;
                         case "mine":
+                            if (isAutoSelectiveMiningActivate) {
+                                th.res = "Autonomous Selective Mining is active! Use command 10 to disable this mode before mine manually.";
+                                break;
+                            }
+                            if (isAutoMiningActivate) {
+                                th.res = "Autonomous Mining is active! Use command 11 to disable this mode before mine manually.";
+                                break;
+                            }
                             if (parts.length==2){
                                 try {
                                     int difficulty = Integer.parseInt(parts[1]);
@@ -354,6 +364,18 @@ public class BackEnd {
                             } else {
                                 th.res = "Wrong syntax.";
                             }   break;
+                        case "toggle-asm":
+                            isAutoSelectiveMiningActivate = !isAutoSelectiveMiningActivate;
+                            isAutoMiningActivate = false;
+                            th.res = "Warning! Only working with fully connected network.";
+                            th.res = "Warning! Still under development.";
+                            th.res = "Done! isAutoSelectiveMiningActivate status: "+isAutoSelectiveMiningActivate;
+                            break;
+                        case "toggle-am":
+                            isAutoMiningActivate = !isAutoMiningActivate;
+                            isAutoSelectiveMiningActivate = false;
+                            th.res = "Done! isAutoSelectiveMiningActivate status: "+isAutoMiningActivate;
+                            break;
                         default:
                             th.res = "Unknown command: \"" + parts[0] + "\" ";
                             break;
@@ -364,35 +386,17 @@ public class BackEnd {
         
             // <editor-fold defaultstate="collapsed" desc="Automation mining">
             // renew network list every 10sec
-//            if ((System.currentTimeMillis()-startTime)/1000>10) {
-//                try {
-//                    System.out.println("start");
-//                    List<PeerThread> refreshedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
-//                    System.out.println(refreshedList.size());
-//                    List<String> refreshedListPort = new ArrayList<>();
-//                    refreshedList.forEach((temp)->{
-//                        System.out.println(temp.getClientSocket().getPort());
-//                        refreshedListPort.add(String.valueOf(temp.getClientSocket().getPort()));
-//                    });
-//                    miningDuty.retainAll(refreshedListPort);
-//                    miningDuty.add(String.valueOf(localPort));
-//                    miningDuty = IPSort.IPSort(miningDuty);
-//                    System.out.println(miningDuty.size());
-//                    miningDuty.forEach(System.out::println);                
-//                    String pingpong = "PING "+ gson.toJson(miningDuty);
-//                    peerNetwork.broadcast(pingpong);
-//                    startTime = System.currentTimeMillis();
-//                } catch (Exception ex) {
-//                    LOGGER.error("Error sorting miningDuty list");
-//                    ex.printStackTrace();
-//                }
-//            }
             int localHeight = blockChain.size();
-            if (isAutominingActivate){
+            if (isAutoMiningActivate&&(TXmempool.size()>=3)){                
+                LOGGER.info("Auto mining with difficulty = 3");
+                String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
+                LOGGER.info(logger);
+            }
+            
+            if (isAutoSelectiveMiningActivate){
                 // refresh mining duty list after 10 seconds
                 if ((System.currentTimeMillis()-startTime)/1000>10) {
                     try {
-//                        System.out.println("start");
                         List<PeerThread> refreshedList = peerNetwork.peerThreads.stream().filter(a -> a.peerReader.isConnected).collect(Collectors.toList());
 //                        System.out.println(refreshedList.size());
 
@@ -401,52 +405,60 @@ public class BackEnd {
 //                            System.out.println(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));
                             refreshedListAddr.add(temp.getClientSocket().getInetAddress().toString().replaceAll("/", ""));
                         });
-                        miningDuty.retainAll(refreshedListAddr);
+                        miningDuty.clear();
+                        miningDuty.addAll(refreshedListAddr);
                         miningDuty.add(String.valueOf(localHost));
                         miningDuty = IPSort.IPSort(miningDuty);
 //                        System.out.println(miningDuty.size());
-//                        miningDuty.forEach(System.out::println);                
-                        String pingpong = "PING "+ gson.toJson(miningDuty);
-                        peerNetwork.broadcast(pingpong);
+                        miningDuty.forEach(System.out::println);                
+//                        String pingpong = "PING "+ gson.toJson(miningDuty);
+//                        peerNetwork.broadcast(pingpong);
                         startTime = System.currentTimeMillis();
                     } catch (Exception ex) {
                         LOGGER.error("Error sorting miningDuty list");
                         ex.printStackTrace();
                     }       
                 }
-
-                if ((bestHeight > localHeight)||(TXmempool.size()>=1)) {
+                if (localHeight!=0) { 
+//                    int bestHeight
+                    if ((bestHeight > localHeight)||(TXmempool.size()>=1)||(receivednewBLOCK)) {
                     // reset mining duty list
                     if (toBlockNum == 0) {
+                        isRunningDuty = true;
                         try {
                             fixedMiningDuty = IPSort.IPSort(miningDuty);
-                            fromBlockNum = (bestHeight <= localHeight) ? blockChain.size() : blockChain.size()-(bestHeight-localHeight);
+                            fromBlockNum = (bestHeight <= localHeight) ? blockChain.size() : receivednewBLOCK ? blockChain.size()-1 : blockChain.size()-(bestHeight-localHeight);
                             toBlockNum = fromBlockNum+fixedMiningDuty.size();
                         } catch (Exception ex) {
                             LOGGER.error("Error sorting miningDuty list");
                             ex.printStackTrace();
                         }
                     }
-                    int i = (bestHeight <= localHeight) ? (blockChain.size() - fromBlockNum) : (bestHeight - fromBlockNum);
-                    System.out.println("fromBlockNum "+fromBlockNum);
-                    System.out.println("toBlockNum "+toBlockNum);
-                    System.out.println("fixedMiningDuty.size() "+fixedMiningDuty.size());
-                    System.out.println("i "+i);
-                    System.out.println(fixedMiningDuty.get(i));
-                    System.out.println(fixedMiningDuty);
+                    int i = (bestHeight <= localHeight) ? (blockChain.size() - fromBlockNum) : receivednewBLOCK ? blockChain.size()-1 : (bestHeight - fromBlockNum);
+//                    System.out.println("fromBlockNum "+fromBlockNum);
+//                    System.out.println("toBlockNum "+toBlockNum);
+//                    System.out.println("fixedMiningDuty.size() "+fixedMiningDuty.size());
+//                    System.out.println("i "+i);
+//                    System.out.println(fixedMiningDuty.get(i));
+//                    System.out.println(fixedMiningDuty);
                     boolean myRole = false;
                     if (fixedMiningDuty.get(i).equalsIgnoreCase(localHost)){
-                            int previousIndex = blockChain.get(blockChain.size() - 1).getIndex();
-                            LOGGER.info("Auto mining with difficulty = 3");
-                            String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
-                            LOGGER.info(logger);
-                            myRole = true;
-                            while (blockChain.get(blockChain.size() - 1).getIndex()!=previousIndex+1){TimeUnit.MILLISECONDS.sleep(100);}
+                        int previousIndex = blockChain.get(blockChain.size() - 1).getIndex();
+                        LOGGER.info("Auto mining with difficulty = 3");
+                        String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
+                        LOGGER.info(logger);
+                        myRole = true;
+                        while (blockChain.get(blockChain.size() - 1).getIndex()!=previousIndex+1){TimeUnit.MILLISECONDS.sleep(100);}
+                    } else {
+                        TimeUnit.MILLISECONDS.sleep(1000);
                     }
-                    System.out.println("blockChain.size() "+blockChain.size());
+//                    System.out.println("blockChain.size() "+blockChain.size());
                     toBlockNum = ((i==fixedMiningDuty.size()-1)&&(blockChain.size()==toBlockNum)) ? 0 : ((i==fixedMiningDuty.size()-1)&&(!myRole)) ? 0 : toBlockNum;
-                    System.out.println("toBlockNum "+toBlockNum);
-                }
+                    isRunningDuty = false;
+                    receivednewBLOCK = false;
+//                    System.out.println("toBlockNum "+toBlockNum);
+                    }
+                }                
             }
             // </editor-fold>
             
@@ -470,7 +482,7 @@ public class BackEnd {
     private Block GenesisBlockGenerator () {      
         NodeWallet coinbase = new NodeWallet();
         // hardcode genesisBlock
-        // create genesis transaction, which sends message "service1_good" to walletA: 
+        // create genesis transaction
         genesisTransaction = new Transaction();
         genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data"); 
         genesisTransaction.timestamps = "2018-07-08 00:00:00";
@@ -620,10 +632,11 @@ public class BackEnd {
     
     private void ProceedPingPong(String payload) {
         try {
+            // handle when node disconnect is not implemented
             List<String> neighborDutyList = gson.fromJson(payload, new TypeToken<List<String>>(){}.getType());
             miningDuty.addAll(neighborDutyList);
             miningDuty = StringUtil.removeDuplicate(miningDuty);
-            miningDuty = IPSort.IPSort(miningDuty);
+            miningDuty = IPSort.IPSort(miningDuty);            
         } catch (Exception ex) {
             LOGGER.error("Error sorting miningDuty list");
             ex.printStackTrace();

@@ -41,15 +41,17 @@ public class RpcThread extends Thread {
             while((input = in.readLine()) != null){
                 if ("HELP".equalsIgnoreCase(input)){
                     out.println("################################################# COMMANDS ####################################################");
-                    out.println("#     1) getinfo                           - Gets block chain infomations.                                    #");
+                    out.println("#     1) getinfo                           - Get Blockchain infomation.                                       #");
                     out.println("#     2) createwallet                      - Create a new wallet address.                                     #");
-                    out.println("#     3) unlock <publickey> <privatekey>   - Create a new wallet address.                                     #");
-                    out.println("#     4) getpendingtx                      - Gets all pending transactions.                                   #");
+                    out.println("#     3) unlock <publickey> <privatekey>   - Unlock existing wallet with private and public key.              #");
+                    out.println("#     4) getpendingtx                      - Gets all pending transactieons.                                  #");
                     out.println("#     5) filterblock <block fields> <value>- Filter blockchain based on block fields                          #");
                     out.println("#     6) filtertx <tx fields> <value>      - Filter transaction based on its fields                           #");
-                    out.println("#     7) getaddr                           - Gets my public key                                               #");
-                    out.println("#     8) send <to address> <service:data>  - Send <data> in atransaction.                                     #");
-                    out.println("#     9) mine <difficulty>                 - Mine <difficulty> with Block.                                    #");
+                    out.println("#     7) getaddr                           - Get my public key                                                #");
+                    out.println("#     8) send <to address> <service:data>  - Send <data> in a transaction.                                    #");
+                    out.println("#     9) mine <difficulty>                 - Mine <difficulty> with difficulty.                               #");
+                    out.println("#     10)toggle-asm                        - Toggle autonomous selective mining mode.                         #");
+                    out.println("#     11)toggle-am                         - Toggle autonomous mining mode.                                   #");
                     out.println("###############################################################################################################");
                 } else {
                     req = input;

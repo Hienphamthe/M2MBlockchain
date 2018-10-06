@@ -1,7 +1,6 @@
 package p2p;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -75,7 +74,6 @@ public class PeerNetwork extends Thread {
             LOGGER.info("Connected to socket " + remoteHost + ":" + remotePort + " .");
             peersList.add(remoteHost + ":" + remotePort);
             
-
             PeerThread peerThread = new PeerThread(clientSocket);
             peerThread.start();
             peerThreads.add(peerThread);

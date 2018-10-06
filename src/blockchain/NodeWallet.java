@@ -7,8 +7,13 @@ import java.security.spec.ECGenParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class NodeWallet {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     // not 49byte eckey, rather 75byte key
     public transient ECPrivateKey privateKey;
     public transient ECPublicKey publicKey;
@@ -22,10 +27,9 @@ public final class NodeWallet {
         this.privatekey = StringUtil.getStringFromKey(privateKey);
     }
     
-    public NodeWallet(String pub, String priv) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+    public NodeWallet(String pub, String priv){
         this.publickey = pub;
         this.privatekey = priv;
-        unlockWallet();
     }
 
     public void generateKeyPair() {
@@ -49,26 +53,33 @@ public final class NodeWallet {
 
     public Transaction sendFunds(PublicKey _recipient, String mesg) {
         Transaction transaction = new Transaction();
-        transaction.setInputVariable(publicKey, _recipient, mesg);        
+        transaction.setInputVariable(publicKey, _recipient, mesg);
+        transaction.timestamps = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
         transaction.generateSignature(privateKey);
         return transaction;
     }
 
-    private void unlockWallet() throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
-        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
-        KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
-        
-        byte[] pubEncoded = StringUtil.getKeyByteFromString(publickey);
-        byte[] privEncoded = StringUtil.getKeyByteFromString(privatekey);
-        X509EncodedKeySpec  x509EncodedKeySpec = new X509EncodedKeySpec (pubEncoded);
-        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(privEncoded);
-        ECPublicKey publicKeyCheck = (ECPublicKey) ecKeyFac.generatePublic(x509EncodedKeySpec);
-        ECPrivateKey privateKeyCheck = (ECPrivateKey)ecKeyFac.generatePrivate(pkcs8EncodedKeySpec);
-        
-        if (StringUtil.verifyECDSASig(publicKeyCheck, "helloworld", StringUtil.applyECDSASig(privateKeyCheck,"helloworld"))){
-            this.publicKey = publicKeyCheck;
-            this.privateKey = privateKeyCheck;
-        } 
+    public boolean unlockWallet() {
+        try {
+            Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+            KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
+            
+            byte[] pubEncoded = StringUtil.getKeyByteFromString(publickey);
+            byte[] privEncoded = StringUtil.getKeyByteFromString(privatekey);
+            X509EncodedKeySpec  x509EncodedKeySpec = new X509EncodedKeySpec (pubEncoded);
+            PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(privEncoded);
+            ECPublicKey publicKeyCheck = (ECPublicKey) ecKeyFac.generatePublic(x509EncodedKeySpec);
+            ECPrivateKey privateKeyCheck = (ECPrivateKey)ecKeyFac.generatePrivate(pkcs8EncodedKeySpec);
+            
+            if (StringUtil.verifyECDSASig(publicKeyCheck, "helloworld", StringUtil.applyECDSASig(privateKeyCheck,"helloworld"))){                
+                this.publicKey = publicKeyCheck;
+                this.privateKey = privateKeyCheck; 
+                return true;
+            }
+        } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
+            LOGGER.info("Unlock wallet exception.");
+        }
+        return false;
     }
 }
 

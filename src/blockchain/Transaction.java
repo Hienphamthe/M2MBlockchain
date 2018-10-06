@@ -36,7 +36,6 @@ public class Transaction {
 	}
 	
 	public void generateSignature(PrivateKey privateKey) {  
-            timestamps = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message; 
             try {
                 SecureRandom random = SecureRandom.getInstance("SHA1PRNG");

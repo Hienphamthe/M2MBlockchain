@@ -29,7 +29,9 @@ public class Block {
 
     //Calculate new hash based on blocks contents
     public static String calculateHash(Block block) {
-            String record = block.getIndex() + block.getTimestamp() + block.getNonce() + block.getPrevHash()+ block.getMerkleRoot();
+            String record = block.getIndex()
+                    + block.getTimestamp() + block.getNonce() 
+                    + block.getPrevHash()+ block.getMerkleRoot();
             MessageDigest digest = DigestUtils.getSha256Digest();
             byte[] hash = digest.digest(StringUtils.getBytesUtf8(record));
             return Hex.encodeHexString(hash);
