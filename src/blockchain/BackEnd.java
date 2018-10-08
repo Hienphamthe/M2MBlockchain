@@ -117,7 +117,6 @@ public class BackEnd {
                     //Jump to next peer, if the current is local                
                     if(StringUtil.isLocal(addr[0])&&String.valueOf(localPort).equals(addr[1])){
                         isLocalSocket = true;
-    //                    LOGGER.info("1 same host redundancy. Excluded!");
                         continue;
                     }
                     peersListMainThread.add(peer);
@@ -134,14 +133,7 @@ public class BackEnd {
                 }
             }
         }
-        // </editor-fold>
-               
-        
-//        //(DEBUG) Show current blockchain 
-//        LOGGER.info(prettyGson.toJson(blockChain));
-//        //(DEBUG) Show current blockheight
-//        LOGGER.info("Local blockchain block height: "+bestHeight);
- 
+        // </editor-fold> 
 
         // <editor-fold defaultstate="collapsed" desc="P2p communication">
         /**
@@ -224,10 +216,6 @@ public class BackEnd {
                             if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
-                                System.out.println("\n\n\n");
-                                System.out.println(blockChain.isEmpty());
-                                System.out.println(Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1)));
-                                System.out.println("\n\n\n");
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
                                     blockChain.add(newBlock);
                                     receivednewBLOCK = isRunningDuty ? true : false;
@@ -247,7 +235,7 @@ public class BackEnd {
                         }
                         else if ("TRANSACTION".equalsIgnoreCase(cmd)) {
                             Transaction newTransaction = gson.fromJson(payload, Transaction.class);
-                            newTransaction.Transaction();
+                            newTransaction.DecodeString2Key();
                             if (newTransaction!=null 
                                     && newTransaction.processTransaction() 
                                     && !(TXmempool.stream().anyMatch(newTransaction::equals))
@@ -314,7 +302,7 @@ public class BackEnd {
                                             th.res = "Wrong syntax - send <to address> <data>";
                                         } else {
                                             LOGGER.info("My node is Attempting to send message ("+mesg+") to "+toAddress+"...");
-                                            Transaction tx = myNode.sendFunds(DecodeRecipient(toAddress), mesg);
+                                            Transaction tx = myNode.sendFunds(StringUtil.DecodeString2Key(toAddress), mesg);
                                             if(tx!=null && tx.processTransaction()){
                                                 TXmempool.add(tx);
                                                 th.res = "Transaction write Success!";
@@ -481,16 +469,12 @@ public class BackEnd {
     // <editor-fold defaultstate="collapsed" desc="Methods">
     private Block GenesisBlockGenerator () {      
         NodeWallet coinbase = new NodeWallet();
-        // hardcode genesisBlock
-        // create genesis transaction
-        genesisTransaction = new Transaction();
-        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data"); 
+        genesisTransaction = new Transaction(coinbase.publicKey, myNode.publicKey, "genesis:data");
         genesisTransaction.timestamps = "2018-07-08 00:00:00";
         genesisTransaction.generateSignature(coinbase.privateKey);	 //manually sign the genesis transaction	
         genesisTransaction.transactionId = "0";                          //manually set the transaction id        
         
         LOGGER.info("Creating and mining Genesis block... ");
-        //Genesis block
         Block genesisBlock = new Block();
         genesisBlock.setPrevHash("0");
         genesisBlock.setIndex(0);
@@ -500,7 +484,7 @@ public class BackEnd {
         genesisBlock.addTransaction(genesisTransaction);
         
         // add to TxMap after successfully check Tx
-        TxMap.add(genesisTransaction); //its important to store our first transaction in the tx list.
+        TxMap.add(genesisTransaction); 
         
         genesisBlock.setCreator(localSocketDirectory);
         genesisBlock.setHash(genesisBlock.mineBlock());
@@ -509,42 +493,27 @@ public class BackEnd {
     }
 
     private boolean createNodeWallet() throws IOException {  
-        boolean result = false;
         if (!addressFile.exists()) {
             LOGGER.info("Empty addressesFile. Creating new one ..."); 
             newNode();
             FileUtils.writeStringToFile(addressFile,gson.toJson(myNode),StandardCharsets.UTF_8,true);  
-            result = true;
+            return true;
         } else {
             LOGGER.info("AddressesFile exists.");
-            boolean isLocalSocket = false;
-            for (String addr : FileUtils.readLines(addressFile,StandardCharsets.UTF_8)) {
-                if (gson.fromJson(addr, NodeWallet.class).creator.equalsIgnoreCase(localSocketDirectory)){
-                    isLocalSocket = true;
-                    break;                 
-                }       
-            }
-            if (!isLocalSocket) {
+            if (!(FileUtils.readLines(addressFile,StandardCharsets.UTF_8)
+                    .stream().anyMatch(element -> element.equalsIgnoreCase(localSocketDirectory)))) {
                 newNode();
                 FileUtils.writeStringToFile(addressFile,"\r\n"+gson.toJson(myNode),StandardCharsets.UTF_8,true); 
-                result = true;
+                return true;
             }        
         }
-        return result;
+        return false;
     }
-    
     private void newNode() {
         myNode = new NodeWallet();
         LOGGER.info("My public key: "+ myNode.publickey);                
         myNode.creator = localSocketDirectory;
-    }
-
-    private PublicKey DecodeRecipient(String recipient) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
-        byte[] reciepientEncoded = StringUtil.getKeyByteFromString(recipient);
-        KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
-        X509EncodedKeySpec  x509EncodedKeySpecRecipient = new X509EncodedKeySpec (reciepientEncoded);   
-        return ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
-    }  
+    } 
     
     private <T> String FindField(T singleElement, String fieldName) { // T: Block or Tx
         String fieldValue = null;
@@ -558,26 +527,6 @@ public class BackEnd {
             LOGGER.error("No such field in FindFieldBlock(). (Optional) Keep searching in transactions field");
         }       
         return fieldValue;
-    }
-
-    private boolean MineBlock(int difficulty, PeerNetwork peerNetwork) {
-        boolean status = false;
-        Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
-        if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
-            try {
-                blockChain.add(newBlock);
-                status = true;
-                FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);
-                peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));
-                TxMap.addAll(TXmempool);                                        
-                TXmempool.clear();
-            } catch (IOException ex) {
-                LOGGER.error("Error while writing to dataFile.");
-            }
-        } else {
-            status = false;
-        }
-        return status;
     }
     
     private List<Transaction> FilterTx(String fieldName, String value) {
@@ -628,6 +577,26 @@ public class BackEnd {
                 return !resultBlock.isEmpty() ? resultBlock : null;
             }
         }
+    }
+    
+    private boolean MineBlock(int difficulty, PeerNetwork peerNetwork) {
+        boolean status = false;
+        Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
+        if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
+            try {
+                blockChain.add(newBlock);
+                status = true;
+                FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(newBlock), StandardCharsets.UTF_8,true);
+                peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));
+                TxMap.addAll(TXmempool);                                        
+                TXmempool.clear();
+            } catch (IOException ex) {
+                LOGGER.error("Error while writing to dataFile.");
+            }
+        } else {
+            status = false;
+        }
+        return status;
     }
     
     private void ProceedPingPong(String payload) {

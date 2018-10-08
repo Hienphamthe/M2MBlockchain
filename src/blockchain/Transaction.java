@@ -3,9 +3,6 @@ import Utils.StringUtil;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +20,26 @@ public class Transaction {
         public String signature;
 	
 	
-	
+	public Transaction (PublicKey from, PublicKey to, String mesg) {
+            this.senderPubKey = from;
+            this.recipientPubKey = to;
+            this.message = mesg;
+            this.recipient = StringUtil.getStringFromKey(recipientPubKey);
+            this.sender = StringUtil.getStringFromKey(senderPubKey);
+        }
+        
+        public void DecodeString2Key () {            
+            try {
+                if (!sender.isEmpty() && !recipient.isEmpty() && !signature.isEmpty()){
+                    this.senderPubKey = StringUtil.DecodeString2Key(sender);
+                    this.recipientPubKey = StringUtil.DecodeString2Key(recipient);
+                    this.signatureByte = StringUtil.decodeSignature(signature);
+                }   
+            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
+                LOGGER.error("Error while decoding signature.");
+            }      
+        }
+        
 	public boolean processTransaction() {		
             if(verifySignature() == false) {
                 LOGGER.info("Transaction Signature failed to verify");
@@ -37,13 +53,13 @@ public class Transaction {
 	}
 	
 	public void generateSignature(PrivateKey privateKey) {  
-            String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message; 
             try {
                 SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
                 sequence = String.valueOf(random.nextInt());
             } catch (NoSuchAlgorithmException ex) {
                 LOGGER.info("No random generator algo exists.");
             }
+            String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message; 
             transactionId = calulateHash(data);
             signatureByte = StringUtil.applyECDSASig(privateKey,transactionId);
             signature = StringUtil.encodeSignature(signatureByte);
@@ -57,42 +73,14 @@ public class Transaction {
             String data = StringUtil.getStringFromKey(senderPubKey) + StringUtil.getStringFromKey(recipientPubKey) + timestamps + message;
             return (calulateHash(data) == null ? transactionId == null : calulateHash(data).equals(transactionId));
         }
-	
 	private String calulateHash(String data) {
             return StringUtil.applySha256(data + sequence);
 	}
         
-        public void setInputVariable (PublicKey from, PublicKey to, String mesg) {
-            this.senderPubKey = from;
-            this.recipientPubKey = to;
-            this.message = mesg;
-            this.recipient = StringUtil.getStringFromKey(recipientPubKey);
-            this.sender = StringUtil.getStringFromKey(senderPubKey);
-        }
-
         @Override
         public boolean equals (Object o) {
             Transaction tx = (Transaction) o;
             return (tx.transactionId == null ? this.transactionId == null : tx.transactionId.equals(this.transactionId));
-        }
-        
-        public void Transaction () {            
-            try {
-                if (!sender.isEmpty() && !recipient.isEmpty() && !signature.isEmpty()){
-                Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
-                byte[] senderEncoded = StringUtil.getKeyByteFromString(sender);
-                byte[] reciepientEncoded = StringUtil.getKeyByteFromString(recipient);
-                KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
-                X509EncodedKeySpec  x509EncodedKeySpecSender = new X509EncodedKeySpec (senderEncoded);
-                X509EncodedKeySpec  x509EncodedKeySpecRecipient = new X509EncodedKeySpec (reciepientEncoded);        
-                this.senderPubKey = ecKeyFac.generatePublic(x509EncodedKeySpecSender);
-                this.recipientPubKey = ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
-                this.signatureByte = StringUtil.decodeSignature(signature);
-                }   
-                
-            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                LOGGER.error("Error while decoding signature.");
-            }      
         }
 }
 

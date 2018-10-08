@@ -2,10 +2,12 @@ package blockchain;
 
 import Utils.StringUtil;
 import java.security.MessageDigest;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Level;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.binary.StringUtils;
@@ -83,14 +85,33 @@ public class Block {
             if (oldBlock.getIndex() + 1 != newBlock.getIndex()) {
                 return false;
             }
+            
             if (!oldBlock.getHash().equals(newBlock.getPrevHash())) {
                 return false;
             }
+            
+            for(Transaction tx : newBlock.transactions){
+                if (!tx.processTransaction()) {
+                    return false;
+                }
+            }
+            
+            if (!StringUtil.getMerkleRoot(newBlock.transactions).equals(newBlock.getMerkleRoot())) {
+                return false;
+            }
+            
             if (!calculateHash(newBlock).equals(newBlock.getHash())) {
                 return false;
             }
-            if (!StringUtil.getMerkleRoot(newBlock.transactions).equals(newBlock.getMerkleRoot())) {
-                return false;
+            
+            try {
+                long deltaDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(newBlock.getTimestamp()).getTime() - 
+                        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(oldBlock.getTimestamp()).getTime();
+                if (deltaDate < 0) {
+                    return false;
+                }
+            } catch (ParseException ex) {
+                LOGGER.error("New block timestamp is even earlier than the old block.");
             }
             return true;
     }

@@ -7,6 +7,8 @@ import com.google.gson.GsonBuilder;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List; 
@@ -183,5 +185,12 @@ public class StringUtil {
         list.clear();
         list.addAll(newList);
         return list;
+    }
+    
+    public static PublicKey DecodeString2Key (String hexStringKey) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchProviderException {
+        byte[] hexStringKeyEncoded = StringUtil.getKeyByteFromString(hexStringKey);
+        KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
+        X509EncodedKeySpec  x509EncodedKeySpecRecipient = new X509EncodedKeySpec (hexStringKeyEncoded);   
+        return ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
     }
 }

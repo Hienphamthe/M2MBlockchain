@@ -26,6 +26,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -137,13 +138,6 @@ public class HackerBackEnd {
             }
         }
         // </editor-fold>
-               
-        
-//        //(DEBUG) Show current blockchain 
-//        LOGGER.info(prettyGson.toJson(blockChain));
-//        //(DEBUG) Show current blockheight
-//        LOGGER.info("Local blockchain block height: "+bestHeight);
- 
 
         // <editor-fold defaultstate="collapsed" desc="P2p communication">
         /**
@@ -160,7 +154,6 @@ public class HackerBackEnd {
         // ********************************         
         if (blockChain.isEmpty()) peerNetwork.broadcast("VERSION "+0);
         else peerNetwork.broadcast("VERSION "+ blockChain.size());
-//        if (!miningDuty.isEmpty()) peerNetwork.broadcast("PING "+ gson.toJson(miningDuty));
         
         
         while (true) {
@@ -215,12 +208,6 @@ public class HackerBackEnd {
                             if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
-                                System.out.println("\n\n\n");
-                                System.out.println(blockChain.isEmpty());
-                                if (!blockChain.isEmpty()){
-                                    System.out.println(Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1)));
-                                }
-                                System.out.println("\n\n\n");
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
                                     blockChain.add(newBlock);
                                     TxMap.addAll(newBlock.transactions);
@@ -239,7 +226,7 @@ public class HackerBackEnd {
                         }
                         else if ("TRANSACTION".equalsIgnoreCase(cmd)) {
                             Transaction newTransaction = gson.fromJson(payload, Transaction.class);
-                            newTransaction.Transaction();
+                            newTransaction.DecodeString2Key();
                             if (newTransaction!=null 
                                     && newTransaction.processTransaction() 
                                     && !(TXmempool.stream().anyMatch(newTransaction::equals))
@@ -305,11 +292,10 @@ public class HackerBackEnd {
                                             th.res = "Wrong syntax - send <to address> <data>";
                                         } else {
                                             LOGGER.info("My node is Attempting to send message ("+mesg+") to "+toAddress+"...");
-                                            hackedTx = myNode.sendFunds(DecodeRecipient(toAddress), mesg);
+                                            hackedTx = myNode.sendFunds(StringUtil.DecodeString2Key(toAddress), mesg);
                                             if(hackedTx!=null && hackedTx.processTransaction()){
                                                 TXmempool.add(hackedTx);
                                                 th.res = "Transaction write Success!";
-//                                                peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx));
                                             }
                                         }
                                     } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
@@ -321,13 +307,13 @@ public class HackerBackEnd {
                             }                  
                             break;   
                         case "maltx_key":
-                            Transaction tx = hackedTx;
+                            Transaction tx = gson.fromJson(prettyGson.toJson(hackedTx), Transaction.class);
                             tx.sender = "24HVuRxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxRoL9Zav";
                             peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx));
                             th.res = prettyGson.toJson(tx);
                             break;
                         case "maltx_message":
-                            Transaction tx1 = hackedTx;
+                            Transaction tx1 = gson.fromJson(prettyGson.toJson(hackedTx), Transaction.class);
                             tx1.message = "Iam:hacker";
                             peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx1));
                             th.res = prettyGson.toJson(tx1);
@@ -344,15 +330,16 @@ public class HackerBackEnd {
                                 }
                             } else {
                                 th.res = "Wrong syntax.";
-                            }   break;   
+                            }   
+                            break;   
                         case "malblock_nonce":
-                            Block b = hackedBlock;
+                            Block b = gson.fromJson(prettyGson.toJson(hackedBlock), Block.class);
                             b.setNonce(777777);
                             peerNetwork.broadcast("BLOCK " + gson.toJson(b));
                             th.res = prettyGson.toJson(b);
                             break;
                         case "malblock_txmessage":
-                            Block b1 = hackedBlock;
+                            Block b1 = gson.fromJson(prettyGson.toJson(hackedBlock), Block.class);
                             b1.transactions.get(0).message="Iam:hacker";
                             peerNetwork.broadcast("BLOCK " + gson.toJson(b1));
                             th.res = prettyGson.toJson(b1);
@@ -385,14 +372,11 @@ public class HackerBackEnd {
     // <editor-fold defaultstate="collapsed" desc="Methods">
     private Block GenesisBlockGenerator () {      
         NodeWallet coinbase = new NodeWallet();
-        // hardcode genesisBlock
-        // create genesis transaction
-        genesisTransaction = new Transaction();
-        genesisTransaction.setInputVariable(coinbase.publicKey, myNode.publicKey, "genesis:data"); 
+        // hardcode genesisBlock && create genesis transaction
+        genesisTransaction = new Transaction(coinbase.publicKey, myNode.publicKey, "genesis:data");
         genesisTransaction.timestamps = "2018-07-08 00:00:00";
-        genesisTransaction.generateSignature(coinbase.privateKey);	 //manually sign the genesis transaction	
-        genesisTransaction.transactionId = "0";                          //manually set the transaction id        
-        
+        genesisTransaction.generateSignature(coinbase.privateKey);	 
+        genesisTransaction.transactionId = "0";                                
         LOGGER.info("Creating and mining Genesis block... ");
         //Genesis block
         Block genesisBlock = new Block();
@@ -413,60 +397,42 @@ public class HackerBackEnd {
     }
 
     private boolean createNodeWallet() throws IOException {  
-        boolean result = false;
         if (!addressFile.exists()) {
             LOGGER.info("Empty addressesFile. Creating new one ..."); 
             newNode();
             FileUtils.writeStringToFile(addressFile,gson.toJson(myNode),StandardCharsets.UTF_8,true);  
-            result = true;
+            return true;
         } else {
             LOGGER.info("AddressesFile exists.");
-            boolean isLocalSocket = false;
-            for (String addr : FileUtils.readLines(addressFile,StandardCharsets.UTF_8)) {
-                if (gson.fromJson(addr, NodeWallet.class).creator.equalsIgnoreCase(localSocketDirectory)){
-                    isLocalSocket = true;
-                    break;                 
-                }       
-            }
-            if (!isLocalSocket) {
+            if (!(FileUtils.readLines(addressFile,StandardCharsets.UTF_8)
+                    .stream().anyMatch(element -> element.equalsIgnoreCase(localSocketDirectory)))) {
                 newNode();
                 FileUtils.writeStringToFile(addressFile,"\r\n"+gson.toJson(myNode),StandardCharsets.UTF_8,true); 
-                result = true;
+                return true;
             }        
         }
-        return result;
+        return false;
     }
-    
     private void newNode() {
         myNode = new NodeWallet();
         LOGGER.info("My public key: "+ myNode.publickey);                
         myNode.creator = localSocketDirectory;
-    }
+    } 
 
-    private PublicKey DecodeRecipient(String recipient) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
-        byte[] reciepientEncoded = StringUtil.getKeyByteFromString(recipient);
-        KeyFactory ecKeyFac = KeyFactory.getInstance("ECDSA","BC");
-        X509EncodedKeySpec  x509EncodedKeySpecRecipient = new X509EncodedKeySpec (reciepientEncoded);   
-        return ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
-    }  
-
-    private boolean MineBlock(int difficulty) {
-        boolean status = false;
+    private boolean MineBlock(int difficulty) {        
+        hackedBlock = null;
         hackedBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
         if (Block.isBlockValid(hackedBlock, blockChain.get(blockChain.size() - 1))) {
             try {
-//                blockChain.add(hackedBlock);
-                status = true;
+                blockChain.add(hackedBlock);
                 FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(hackedBlock), StandardCharsets.UTF_8,true);
-//                peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));                                       
                 TXmempool.clear();
+                return true;
             } catch (IOException ex) {
                 LOGGER.error("Error while writing to dataFile.");
             }
-        } else {
-            status = false;
         }
-        return status;
+        return false;
     } 
     // </editor-fold>
 }

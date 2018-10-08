@@ -49,9 +49,8 @@ public final class NodeWallet {
         }
     }
 
-    public Transaction sendFunds(PublicKey _recipient, String mesg) {
-        Transaction transaction = new Transaction();
-        transaction.setInputVariable(publicKey, _recipient, mesg);
+    public Transaction sendFunds(PublicKey recipient, String mesg) {
+        Transaction transaction = new Transaction(publicKey, recipient, mesg);
         transaction.timestamps = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
         transaction.generateSignature(privateKey);
         return transaction;
