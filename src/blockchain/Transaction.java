@@ -5,6 +5,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,8 +76,9 @@ public class Transaction {
             return (tx.transactionId == null ? this.transactionId == null : tx.transactionId.equals(this.transactionId));
         }
         
-        public void Transaction () throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {            
-            if (!sender.isEmpty() && !recipient.isEmpty() && !signature.isEmpty()){
+        public void Transaction () {            
+            try {
+                if (!sender.isEmpty() && !recipient.isEmpty() && !signature.isEmpty()){
                 Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
                 byte[] senderEncoded = StringUtil.getKeyByteFromString(sender);
                 byte[] reciepientEncoded = StringUtil.getKeyByteFromString(recipient);
@@ -86,6 +88,11 @@ public class Transaction {
                 this.senderPubKey = ecKeyFac.generatePublic(x509EncodedKeySpecSender);
                 this.recipientPubKey = ecKeyFac.generatePublic(x509EncodedKeySpecRecipient);
                 this.signatureByte = StringUtil.decodeSignature(signature);
-            }            
+                }   
+                
+            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
+                LOGGER.error("Error while decoding signature.");
+            }      
         }
 }
+

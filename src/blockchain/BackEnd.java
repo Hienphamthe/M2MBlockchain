@@ -224,6 +224,10 @@ public class BackEnd {
                             if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
+                                System.out.println("\n\n\n");
+                                System.out.println(blockChain.isEmpty());
+                                System.out.println(Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1)));
+                                System.out.println("\n\n\n");
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
                                     blockChain.add(newBlock);
                                     receivednewBLOCK = isRunningDuty ? true : false;
@@ -243,11 +247,7 @@ public class BackEnd {
                         }
                         else if ("TRANSACTION".equalsIgnoreCase(cmd)) {
                             Transaction newTransaction = gson.fromJson(payload, Transaction.class);
-                            try {
-                                newTransaction.Transaction();
-                            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                                ex.printStackTrace();
-                            }
+                            newTransaction.Transaction();
                             if (newTransaction!=null 
                                     && newTransaction.processTransaction() 
                                     && !(TXmempool.stream().anyMatch(newTransaction::equals))

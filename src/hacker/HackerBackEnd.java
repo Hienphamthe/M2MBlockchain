@@ -215,6 +215,12 @@ public class HackerBackEnd {
                             if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
+                                System.out.println("\n\n\n");
+                                System.out.println(blockChain.isEmpty());
+                                if (!blockChain.isEmpty()){
+                                    System.out.println(Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1)));
+                                }
+                                System.out.println("\n\n\n");
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
                                     blockChain.add(newBlock);
                                     TxMap.addAll(newBlock.transactions);
@@ -233,11 +239,7 @@ public class HackerBackEnd {
                         }
                         else if ("TRANSACTION".equalsIgnoreCase(cmd)) {
                             Transaction newTransaction = gson.fromJson(payload, Transaction.class);
-                            try {
-                                newTransaction.Transaction();
-                            } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeySpecException ex) {
-                                ex.printStackTrace();
-                            }
+                            newTransaction.Transaction();
                             if (newTransaction!=null 
                                     && newTransaction.processTransaction() 
                                     && !(TXmempool.stream().anyMatch(newTransaction::equals))
@@ -320,11 +322,11 @@ public class HackerBackEnd {
                             break;   
                         case "maltx_key":
                             Transaction tx = hackedTx;
-                            tx.recipient = "24HVuRxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxRoL9Zav";
+                            tx.sender = "24HVuRxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxRoL9Zav";
                             peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx));
                             th.res = prettyGson.toJson(tx);
                             break;
-                        case "maltx_message:":
+                        case "maltx_message":
                             Transaction tx1 = hackedTx;
                             tx1.message = "Iam:hacker";
                             peerNetwork.broadcast("TRANSACTION " + gson.toJson(tx1));
@@ -349,7 +351,7 @@ public class HackerBackEnd {
                             peerNetwork.broadcast("BLOCK " + gson.toJson(b));
                             th.res = prettyGson.toJson(b);
                             break;
-                        case "malblock_txmessage:":
+                        case "malblock_txmessage":
                             Block b1 = hackedBlock;
                             b1.transactions.get(0).message="Iam:hacker";
                             peerNetwork.broadcast("BLOCK " + gson.toJson(b1));
@@ -453,7 +455,7 @@ public class HackerBackEnd {
         hackedBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
         if (Block.isBlockValid(hackedBlock, blockChain.get(blockChain.size() - 1))) {
             try {
-                blockChain.add(hackedBlock);
+//                blockChain.add(hackedBlock);
                 status = true;
                 FileUtils.writeStringToFile(dataFile,"\r\n"+gson.toJson(hackedBlock), StandardCharsets.UTF_8,true);
 //                peerNetwork.broadcast("BLOCK " + gson.toJson(newBlock));                                       

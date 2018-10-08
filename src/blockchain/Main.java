@@ -29,13 +29,13 @@ public class Main {
                 new FrontEnd().startFrontend();
             } else if (s.equalsIgnoreCase("backend")) {
                 new BackEnd().startBackend();
-            } else if (s.equalsIgnoreCase("tester")) {
+            } else if (s.equalsIgnoreCase("testerB")) {
                 new HackerBackEnd().startBackend();
-                TimeUnit.MILLISECONDS.sleep(1000);
+            } else if (s.equalsIgnoreCase("testerF")) {
                 new FrontEnd().startFrontend();
             }
             else {
-                LOGGER.info("Input should be: frontend | backend");
+                LOGGER.info("Input should be: frontend | backend | testerB | testerF");
             }
         }        
         LOGGER.info("End of main");
