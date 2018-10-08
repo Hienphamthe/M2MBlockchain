@@ -1,11 +1,13 @@
 package blockchain;
 
+import hacker.*;
 import p2p.*;
 
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,10 @@ public class Main {
                 new FrontEnd().startFrontend();
             } else if (s.equalsIgnoreCase("backend")) {
                 new BackEnd().startBackend();
+            } else if (s.equalsIgnoreCase("tester")) {
+                new HackerBackEnd().startBackend();
+                TimeUnit.MILLISECONDS.sleep(1000);
+                new FrontEnd().startFrontend();
             }
             else {
                 LOGGER.info("Input should be: frontend | backend");

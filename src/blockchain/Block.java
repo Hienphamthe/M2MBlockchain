@@ -81,13 +81,16 @@ public class Block {
      */
     public static boolean isBlockValid(Block newBlock, Block oldBlock) {
             if (oldBlock.getIndex() + 1 != newBlock.getIndex()) {
-                    return false;
+                return false;
             }
             if (!oldBlock.getHash().equals(newBlock.getPrevHash())) {
-                    return false;
+                return false;
             }
             if (!calculateHash(newBlock).equals(newBlock.getHash())) {
-                    return false;
+                return false;
+            }
+            if (!StringUtil.getMerkleRoot(newBlock.transactions).equals(newBlock.getMerkleRoot())) {
+                return false;
             }
             return true;
     }
