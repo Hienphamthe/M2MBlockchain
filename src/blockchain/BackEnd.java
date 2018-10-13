@@ -9,13 +9,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.PublicKey;
 import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -45,12 +42,12 @@ public class BackEnd {
     public static int localPort = 8017;
     private static String localSocketDirectory;
     // Read list of known peers (List of IP addresses)
-    private final File peerFile = new File("./peers.list");
+    private File peerFile;
     // File to store the blockchain database
     private File dataFile;
     // Store wallet addresses
     private NodeWallet myNode = null;    
-    private final File addressFile = new File("./addresses.list");
+    private File addressFile;
     // Miscellaneous
     private List<String> miningDuty = new ArrayList<>();
     private List<String> fixedMiningDuty;
@@ -92,7 +89,8 @@ public class BackEnd {
          * If exist, to do (explained below)
         */
         localSocketDirectory = localHost+"@"+localPort;
-        
+        addressFile = new File("./"+localSocketDirectory+"/addresses.list");
+        peerFile = new File("./"+localSocketDirectory+"/peers.list");
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
 
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             

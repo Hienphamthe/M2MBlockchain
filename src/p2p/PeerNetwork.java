@@ -51,7 +51,7 @@ public class PeerNetwork extends Thread {
                 Socket clientSocket = listenSocket.accept();
             	PeerThread peerThread = new PeerThread(clientSocket);                
                 peerThread.start();   
-                peerThreads.add(peerThread);
+                peerThreads.add(peerThread);                
             }           
             //listenSocket.close();
         } catch (IOException e) {

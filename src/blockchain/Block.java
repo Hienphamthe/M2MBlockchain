@@ -7,7 +7,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.logging.Level;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.binary.StringUtils;
@@ -31,9 +30,9 @@ public class Block {
 
     //Calculate new hash based on blocks contents
     public static String calculateHash(Block block) {
-            String record = block.getIndex()
-                    + block.getTimestamp() + block.getNonce() 
-                    + block.getPrevHash()+ block.getMerkleRoot();
+            String record = block.getIndex() + block.getCreator()
+                    + block.getTimestamp() + block.getPrevHash() 
+                    + block.getMerkleRoot()+ block.getDifficulty() + block.getNonce();
             MessageDigest digest = DigestUtils.getSha256Digest();
             byte[] hash = digest.digest(StringUtils.getBytesUtf8(record));
             return Hex.encodeHexString(hash);
@@ -58,7 +57,6 @@ public class Block {
     /**
      * Validate and add transactions to this block
      * @param transaction
-     * @return
      */
     public void addTransaction(Transaction transaction) {
         //process transaction and check if valid, unless block is genesis block then ignore.
@@ -66,7 +64,7 @@ public class Block {
             LOGGER.error("No transaction to process.");
         }
         if((!"0".equals(previousHash))) {
-            if((transaction.processTransaction() != true)) {
+            if(!transaction.processTransaction()) {
                 LOGGER.error("Transaction "+transaction.transactionId+" failed to process. Discarded.");               
             }
         }
