@@ -14,9 +14,9 @@ import org.apache.http.impl.client.HttpClientBuilder;
  * @author Student
  */
 public class RESTclient {
-    public static void main(String[] args) throws IOException {
-        CreateTestClient();
-    }
+//    public static void main(String[] args) throws IOException {
+//        CreateTestClient();
+//    }
 
     public static void CreateTestClient() throws IOException {
         try {

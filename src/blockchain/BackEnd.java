@@ -1,5 +1,6 @@
 package blockchain;
 
+import TestPackage.MiningThread;
 import Utils.*;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
@@ -59,6 +60,8 @@ public class BackEnd {
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
     public  List<Transaction> TxMap = new ArrayList<>(); 
+    public Thread mineT;
+    public MiningThread mineObj;
     public final Gson gson = new GsonBuilder().create();
     public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();     
     // </editor-fold>
@@ -210,11 +213,15 @@ public class BackEnd {
                             }
                         } else if ("BLOCK".equalsIgnoreCase(cmd)) {
                             //Store the block given by the other party in the chain
+                            if (mineT.isAlive()){
+                                mineObj.suspendRequest();
+                            }
                             Block newBlock = gson.fromJson(payload, Block.class);                       
                             if (!(blockChain.stream().anyMatch(newBlock::equals))) {
                                 // if dont have any block in current blockchain OR                               
                                 // Check the block, if successful, write it to the local blockchain
                                 if (blockChain.isEmpty() || Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
+                                    mineT.interrupt();
                                     blockChain.add(newBlock);
                                     receivednewBLOCK = isRunningDuty ? true : false;
                                     TxMap.addAll(newBlock.transactions);
@@ -228,6 +235,7 @@ public class BackEnd {
                                     peerNetwork.broadcast("BLOCK " + payload);
                                 } else if (!(newBlock.getIndex()==0)) {
                                     LOGGER.info("Invalid block.");
+                                    mineObj.resumeRequest();
                                 }
                             }
                         }
@@ -579,8 +587,15 @@ public class BackEnd {
     
     private boolean MineBlock(int difficulty, PeerNetwork peerNetwork) {
         boolean status = false;
-        Block newBlock = Block.generateBlock(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
-        if (Block.isBlockValid(newBlock, blockChain.get(blockChain.size() - 1))) {
+        mineObj = new MiningThread();
+        mineObj.setVar(blockChain.get(blockChain.size() - 1), difficulty, TXmempool, localSocketDirectory);
+        
+        mineT = new Thread(mineObj);
+        mineT.start();
+        
+                
+        Block newBlock = mineObj.newBlock;
+        if (newBlock != null){
             try {
                 blockChain.add(newBlock);
                 status = true;
