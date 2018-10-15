@@ -16,17 +16,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.PublicKey;
 import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -52,15 +48,15 @@ public class HackerBackEnd {
     public static int localPort = 8017;
     private static String localSocketDirectory;
     // Read list of known peers (List of IP addresses)
-    private final File peerFile = new File("./peers.list");
+    private File peerFile;
     // File to store the blockchain database
     private File dataFile;
     // Store wallet addresses
     private NodeWallet myNode = null;    
-    private final File addressFile = new File("./addresses.list");
+    private File addressFile;
     // Miscellaneous
     private boolean isAutoSelectiveMiningActivate = false; // Only works with VM
-    boolean isAutoMiningActivate = true;
+    private boolean isAutoMiningActivate = true;
     public int bestHeight;
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
@@ -96,6 +92,8 @@ public class HackerBackEnd {
         */
         localSocketDirectory = localHost+"@"+localPort;
         
+        addressFile = new File("./"+localSocketDirectory+"/addresses.list");
+        peerFile = new File("./"+localSocketDirectory+"/peers.list");
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
 
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             

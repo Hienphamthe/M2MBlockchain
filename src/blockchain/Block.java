@@ -1,5 +1,6 @@
 package blockchain;
 
+import MiningThread.Test;
 import Utils.StringUtil;
 import java.security.MessageDigest;
 import java.text.ParseException;
@@ -26,7 +27,7 @@ public class Block {
     private int difficulty;
     private int nonce;
     private int TxAmount;
-    public  List<Transaction> transactions = new ArrayList<>(); 
+    public  List<Transaction> transactions = new ArrayList<>();  
 
     //Calculate new hash based on blocks contents
     public static String calculateHash(Block block) {
@@ -81,24 +82,29 @@ public class Block {
      */
     public static boolean isBlockValid(Block newBlock, Block oldBlock) {
             if (oldBlock.getIndex() + 1 != newBlock.getIndex()) {
+                LOGGER.error("Wrong block index.");
                 return false;
             }
             
             if (!oldBlock.getHash().equals(newBlock.getPrevHash())) {
+                LOGGER.error("Wrong previous block hash.");
                 return false;
             }
             
             for(Transaction tx : newBlock.transactions){
                 if (!tx.processTransaction()) {
+                    LOGGER.error("A transaction field is wrong.");
                     return false;
                 }
             }
             
             if (!StringUtil.getMerkleRoot(newBlock.transactions).equals(newBlock.getMerkleRoot())) {
+                LOGGER.error("Wrong Merkle tree");
                 return false;
             }
             
             if (!calculateHash(newBlock).equals(newBlock.getHash())) {
+                LOGGER.error("Wrong current block hash.");
                 return false;
             }
             
@@ -106,10 +112,11 @@ public class Block {
                 long deltaDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(newBlock.getTimestamp()).getTime() - 
                         new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(oldBlock.getTimestamp()).getTime();
                 if (deltaDate < 0) {
+                    LOGGER.error("New block timestamp is even earlier than the old block.");
                     return false;
                 }
             } catch (ParseException ex) {
-                LOGGER.error("New block timestamp is even earlier than the old block.");
+                ex.printStackTrace();
             }
             return true;
     }
