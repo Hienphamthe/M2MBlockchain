@@ -1,6 +1,5 @@
 package blockchain;
 
-import MiningThread.Test;
 import Utils.StringUtil;
 import java.security.MessageDigest;
 import java.text.ParseException;

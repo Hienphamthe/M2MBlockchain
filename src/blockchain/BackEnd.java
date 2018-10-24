@@ -53,10 +53,8 @@ public class BackEnd {
     private List<String> miningDuty = new ArrayList<>();
     private List<String> fixedMiningDuty = new ArrayList<>();
     private boolean isAutoSelectiveMiningActivate = false; // Only works with VM
-    boolean isAutoMiningActivate = true;
+    private boolean isAutoMiningActivate = false;
     public int bestHeight;
-    private boolean receivednewBLOCK;
-    private boolean isRunningDuty;
     private ArrayList<String> peersListMainThread;
     public  List<Transaction> TXmempool = new ArrayList<>(); 
     public  List<Transaction> TxMap = new ArrayList<>(); 
@@ -64,7 +62,10 @@ public class BackEnd {
     public MiningThread mineObj;
     public boolean runningMiningThread = false;
     public final Gson gson = new GsonBuilder().create();
-    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();     
+    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
+    // Extension
+    private File weightFile;
+    private boolean isWeightConcept = true;
     // </editor-fold>
 
     public boolean startBackend() throws IOException, InterruptedException{
@@ -93,9 +94,10 @@ public class BackEnd {
          * If exist, to do (explained below)
         */
         localSocketDirectory = localHost+"@"+localPort;
-        addressFile = new File("./"+localSocketDirectory+"/addresses.list");
-        peerFile = new File("./"+localSocketDirectory+"/peers.list");
+        addressFile = new File("./addresses.list");
+        peerFile = new File("./peers.list");
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
+        createWeightList();
 
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             
         // no previous blockchain currently exists and could not find bootstrap node, create genesis block 
@@ -231,7 +233,6 @@ public class BackEnd {
                                         mineT.interrupt();
                                     }
                                     blockChain.add(newBlock);
-                                    receivednewBLOCK = isRunningDuty ? true : false;
                                     TxMap.addAll(newBlock.transactions);
                                     LOGGER.info("Added block " + newBlock.getIndex() + " with hash: ["+ newBlock.getHash() + "]");
                                     // Remove already mined transaction
@@ -370,15 +371,20 @@ public class BackEnd {
                             }   break;
                         case "toggle-asm":
                             isAutoSelectiveMiningActivate = !isAutoSelectiveMiningActivate;
-                            isAutoMiningActivate = false;
-                            th.res = "Warning! Only working with fully connected network.";
-                            th.res = "Warning! Still under development.";
-                            th.res = "Done! isAutoSelectiveMiningActivate status: "+isAutoSelectiveMiningActivate;
+                            isAutoMiningActivate = isWeightConcept = false;
+                            th.res = "Warning! Only working with fully connected network."
+                                    + "\nWarning! Still under development."
+                                    + "\nDone! isAutoSelectiveMiningActivate status: "+isAutoSelectiveMiningActivate;
                             break;
                         case "toggle-am":
                             isAutoMiningActivate = !isAutoMiningActivate;
-                            isAutoSelectiveMiningActivate = false;
+                            isAutoSelectiveMiningActivate = isWeightConcept = false;
                             th.res = "Done! isAutoMiningActivate status: "+isAutoMiningActivate;
+                            break;
+                        case "toggle-weightmining":
+                            isWeightConcept = !isWeightConcept;
+                            isAutoSelectiveMiningActivate = isAutoMiningActivate = false;
+                            th.res = "Done! isWeightConcept status: "+isWeightConcept;
                             break;
                         default:
                             th.res = "Unknown command: \"" + parts[0] + "\" ";
@@ -430,16 +436,6 @@ public class BackEnd {
 //                        String pingpong = "PING "+ gson.toJson(miningDuty);
 //                        peerNetwork.broadcast(pingpong);
 
-                        if (target==0) {
-                            target = blockChain.size()+miningDuty.size();
-                            for (int i=blockChain.size(); i < target; i++) {
-                                String concat = miningDuty.get(i-blockChain.size()).concat(":"+i);
-                                fixedMiningDuty.add(concat);
-                                System.out.println(concat);
-                            }
-                            System.out.println(fixedMiningDuty);
-                        }
-
                         startTime = System.currentTimeMillis();
                     } catch (Exception ex) {
                         LOGGER.error("Error sorting miningDuty list");
@@ -447,7 +443,17 @@ public class BackEnd {
                     }       
                 }
                 if (localHeight!=0) { 
-                    if (TXmempool.size()>=1) {
+                    if (TXmempool.size()>=1) { // tx mempool size threshold
+                        if (target==0) {
+                            target = blockChain.size() + miningDuty.size();
+                            for (int i=blockChain.size(); i < target; i++) {
+                                String concat = miningDuty.get(i-blockChain.size()).concat(":"+i);
+                                fixedMiningDuty.add(concat);
+                                System.out.println(concat);
+                            }
+                            System.out.println(fixedMiningDuty);
+                        }
+                        
                         for (String element : fixedMiningDuty){
                             String [] parts = element.split(":");
                             if (parts[0].equalsIgnoreCase(localHost)&&Integer.valueOf(parts[1])==blockChain.size()){
@@ -457,51 +463,11 @@ public class BackEnd {
                                 break;
                             }    
                         }
-                        target =0;
-                        fixedMiningDuty.clear();
+                        if (blockChain.size()==target){
+                            target =0;
+                            fixedMiningDuty.clear();
+                        }
                     }
-                    
-                    
-                    
-                    
-                    
-//                    if ((bestHeight > localHeight)||(TXmempool.size()>=1)||(receivednewBLOCK)) {
-//                    // reset mining duty list
-//                    if (toBlockNum == 0) {
-//                        isRunningDuty = true;
-//                        try {
-//                            fixedMiningDuty = IPSort.IPSort(miningDuty);
-//                            fromBlockNum = (bestHeight <= localHeight) ? blockChain.size() : receivednewBLOCK ? blockChain.size()-1 : blockChain.size()-(bestHeight-localHeight);
-//                            toBlockNum = fromBlockNum+fixedMiningDuty.size();
-//                        } catch (Exception ex) {
-//                            LOGGER.error("Error sorting miningDuty list");
-//                            ex.printStackTrace();
-//                        }
-//                    }
-//                    int i = (bestHeight <= localHeight) ? (blockChain.size() - fromBlockNum) : receivednewBLOCK ? blockChain.size()-1 : (bestHeight - fromBlockNum);
-////                    System.out.println("fromBlockNum "+fromBlockNum);
-////                    System.out.println("toBlockNum "+toBlockNum);
-////                    System.out.println("fixedMiningDuty.size() "+fixedMiningDuty.size());
-////                    System.out.println("i "+i);
-////                    System.out.println(fixedMiningDuty.get(i));
-////                    System.out.println(fixedMiningDuty);
-//                    boolean myRole = false;
-//                    if (fixedMiningDuty.get(i).equalsIgnoreCase(localHost)){
-//                        int previousIndex = blockChain.get(blockChain.size() - 1).getIndex();
-//                        LOGGER.info("Auto selective mining with difficulty = 3");
-////                        String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
-////                        LOGGER.info(logger);
-//                        myRole = true;
-//                        while (blockChain.get(blockChain.size() - 1).getIndex()!=previousIndex+1){TimeUnit.MILLISECONDS.sleep(100);}
-//                    } else {
-//                        TimeUnit.MILLISECONDS.sleep(1000);
-//                    }
-////                    System.out.println("blockChain.size() "+blockChain.size());
-//                    toBlockNum = ((i==fixedMiningDuty.size()-1)&&(blockChain.size()==toBlockNum)) ? 0 : ((i==fixedMiningDuty.size()-1)&&(!myRole)) ? 0 : toBlockNum;
-//                    isRunningDuty = false;
-//                    receivednewBLOCK = false;
-////                    System.out.println("toBlockNum "+toBlockNum);
-//                    }
                 }                
             }
             // </editor-fold>
@@ -677,5 +643,17 @@ public class BackEnd {
             ex.printStackTrace();
         }
     }   
+
+    private void createWeightList() throws IOException {
+        if (!weightFile.exists()){
+            weightFile = new File("./weightFile.list");
+            FileUtils.writeStringToFile(weightFile,"10.0.0.101"+":20", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"10.0.0.102"+":50", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"10.0.0.103"+":70", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"10.0.0.104"+":40", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"10.0.0.105"+":100", StandardCharsets.UTF_8,true);
+        } else {
+        }
+    }
     // </editor-fold>
 }

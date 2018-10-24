@@ -12,11 +12,11 @@ import com.google.gson.GsonBuilder;
  *
  * @author Student
  */
-public class Test {
-    public final Gson gson = new GsonBuilder().create();
-    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();  
-    
-    public <T> void show(T data) {
-        System.out.print(prettyGson.toJson(data));
-    }
-}
+//public class Test {
+//    public final Gson gson = new GsonBuilder().create();
+//    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();  
+//    
+//    public <T> void show(T data) {
+//        System.out.print(prettyGson.toJson(data));
+//    }
+//}

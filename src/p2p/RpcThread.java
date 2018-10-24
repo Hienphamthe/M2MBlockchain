@@ -52,6 +52,7 @@ public class RpcThread extends Thread {
                     out.println("#     9) mine <difficulty>                 - Mine <difficulty> with difficulty.                               #");
                     out.println("#     10)toggle-asm                        - Toggle autonomous selective mining mode.                         #");
                     out.println("#     11)toggle-am                         - Toggle autonomous mining mode.                                   #");
+                    out.println("#     12)toggle-weightmining               - Toggle autonomous mining based on node weight.                   #");
                     out.println("###############################################################################################################");
                 } else {
                     req = input;
