@@ -28,70 +28,60 @@ import REST.Message;
 public class MessageResource
 {
 
-	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	public String getMessage() throws JsonProcessingException
-	{
-		System.out.println("\nReceived GET Request");
-		// Generate message
-		Message message = Message.generateExampleMessage();
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String getMessage() throws JsonProcessingException
+    {
+        System.out.println("\nReceived GET Request");
+        // Generate message
+        Message message = Message.generateExampleMessage();
 
-		// Serialise Message
-		ObjectMapper mapper = new ObjectMapper();
-		String messageAsJSONstring = mapper.writeValueAsString(message);
+        // Serialise Message
+        ObjectMapper mapper = new ObjectMapper();
+        String messageAsJSONstring = mapper.writeValueAsString(message);
 
-		return messageAsJSONstring;
-	}
+        return messageAsJSONstring;
+    }
 
+    @PUT
+    @Path("/{id}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String updateMessage(@PathParam("id") String id, String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
+    {
+        System.out.println("\nReceived PUT Request with JSON String:\n" + messageAsJSONstring + " and Parameter ID: " + id);
 
+        // Deserialise JSON message
+        ObjectMapper mapper = new ObjectMapper();
+        Message message = mapper.readValue(messageAsJSONstring, Message.class);
+        System.out.println("Updating Message Object with ID: " + id + "...\n" + message);
 
+        return "OK";
+    }
 
-	@PUT
-	@Path("/{id}")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.TEXT_PLAIN)
-	public String updateMessage(@PathParam("id") String id, String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
-	{
-		System.out.println("\nReceived PUT Request with JSON String:\n" + messageAsJSONstring + " and Parameter ID: " + id);
+    @POST
+    @Produces(MediaType.TEXT_PLAIN)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String createMessage(String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
+    {
+        System.out.println("\nReceived POST Request with JSON String:\n" + messageAsJSONstring);
 
-		// Deserialise JSON message
-		ObjectMapper mapper = new ObjectMapper();
-		Message message = mapper.readValue(messageAsJSONstring, Message.class);
-		System.out.println("Updating Message Object with ID: " + id + "...\n" + message);
+        // Deserialise JSON message
+        ObjectMapper mapper = new ObjectMapper();
+        Message message = mapper.readValue(messageAsJSONstring, Message.class);
+        System.out.println("Creating Message Object...\n" + message);
 
-		return "OK";
-	}
+        return "OK";
+    }
 
+    @DELETE
+    @Path("/{id}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String deleteMessage(@PathParam("id") int id)
+    {
+        System.out.println("\nReceived DELETE Request for Resource with ID: " + id);
 
-
-
-	@POST
-	@Produces(MediaType.TEXT_PLAIN)
-	@Consumes(MediaType.APPLICATION_JSON)
-	public String createMessage(String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
-	{
-		System.out.println("\nReceived POST Request with JSON String:\n" + messageAsJSONstring);
-
-		// Deserialise JSON message
-		ObjectMapper mapper = new ObjectMapper();
-		Message message = mapper.readValue(messageAsJSONstring, Message.class);
-		System.out.println("Creating Message Object...\n" + message);
-
-		return "OK";
-	}
-
-
-
-
-	@DELETE
-	@Path("/{id}")
-	@Produces(MediaType.TEXT_PLAIN)
-	public String deleteMessage(@PathParam("id") int id)
-	{
-		System.out.println("\nReceived DELETE Request for Resource with ID: " + id);
-
-		System.out.println("Deleting Message with ID: " + id + "...");
-		return "OK";
-	}
-
+        System.out.println("Deleting Message with ID: " + id + "...");
+        return "OK";
+    }
 }

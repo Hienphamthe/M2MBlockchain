@@ -17,7 +17,9 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -66,6 +68,7 @@ public class BackEnd {
     // Extension
     private File weightFile;
     private boolean isWeightConcept = true;
+    private List<String> weightMiningList = new ArrayList<>();
     // </editor-fold>
 
     public boolean startBackend() throws IOException, InterruptedException{
@@ -97,7 +100,6 @@ public class BackEnd {
         addressFile = new File("./addresses.list");
         peerFile = new File("./peers.list");
         dataFile = new File("./"+localSocketDirectory+"/blockchain.bin");
-        createWeightList();
 
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());             
         // no previous blockchain currently exists and could not find bootstrap node, create genesis block 
@@ -468,7 +470,36 @@ public class BackEnd {
                             fixedMiningDuty.clear();
                         }
                     }
-                }                
+                }
+            }
+            
+            if (isWeightConcept&&(TXmempool.size()>=1)){
+                while (weightMiningList.isEmpty()) {
+                    createWeightList();
+                }
+                weightMiningList = weightMiningList.stream().filter(x -> {
+                    String[] s = x.split(":");
+                    return (Integer.valueOf(s[1]) >= 50);
+                }).collect(Collectors.toList());
+                int maxWeight = 0;                
+                for (String x: weightMiningList) {
+                    String[] s = x.split(":");
+                    if (Integer.parseInt(s[1]) >= maxWeight) {
+                        maxWeight = Integer.parseInt(s[1]);
+                    }
+                }
+                final int permMaxWeight = maxWeight;
+                
+                String selectedNode = weightMiningList.stream().filter(x -> {
+                    String[] s = x.split(":");
+                    return (Integer.valueOf(s[1]) == permMaxWeight);
+                }).collect(Collectors.toList()).get(0);
+                                                
+                if(selectedNode.split(":")[0].equalsIgnoreCase(localHost) ) {
+                    LOGGER.info("Auto selective mining with difficulty = 3");
+                    String logger = MineBlock(3, peerNetwork) ? "Block writes successfully!" : "Invalid block.";
+                    LOGGER.info(logger); 
+                }
             }
             // </editor-fold>
             
@@ -645,13 +676,16 @@ public class BackEnd {
     }   
 
     private void createWeightList() throws IOException {
+        weightFile = new File("./weightFile.list");
         if (!weightFile.exists()){
-            weightFile = new File("./weightFile.list");
             FileUtils.writeStringToFile(weightFile,"10.0.0.101"+":20", StandardCharsets.UTF_8,true);
-            FileUtils.writeStringToFile(weightFile,"10.0.0.102"+":50", StandardCharsets.UTF_8,true);
-            FileUtils.writeStringToFile(weightFile,"10.0.0.103"+":70", StandardCharsets.UTF_8,true);
-            FileUtils.writeStringToFile(weightFile,"10.0.0.104"+":40", StandardCharsets.UTF_8,true);
-            FileUtils.writeStringToFile(weightFile,"10.0.0.105"+":100", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"\n10.0.0.102"+":100", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"\n10.0.0.103"+":70", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"\n10.0.0.104"+":40", StandardCharsets.UTF_8,true);
+            FileUtils.writeStringToFile(weightFile,"\n10.0.0.105"+":50", StandardCharsets.UTF_8,true);
+            for(String line:FileUtils.readLines(weightFile, StandardCharsets.UTF_8)){
+                weightMiningList.add(line);
+            }
         } else {
         }
     }

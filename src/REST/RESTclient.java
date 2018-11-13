@@ -20,38 +20,38 @@ public class RESTclient {
 
     public static void CreateTestClient() throws IOException {
         try {
-                    // create HTTP Client
-                    HttpClient httpClient = HttpClientBuilder.create().build();
+            // create HTTP Client
+            HttpClient httpClient = HttpClientBuilder.create().build();
 
-                    // Create new getRequest with below mentioned URL
-                    HttpGet getRequest = new HttpGet("http://localhost:8080/CrunchifyRESTJerseyExample/crunchify/ctofservice/");
+            // Create new getRequest with below mentioned URL
+            HttpGet getRequest = new HttpGet("http://localhost:8080/CrunchifyRESTJerseyExample/crunchify/ctofservice/");
 
-                    // Add additional header to getRequest which accepts application/xml data
-                    getRequest.addHeader("accept", "application/xml");
+            // Add additional header to getRequest which accepts application/json data
+            getRequest.addHeader("accept", "application/json");
 
-                    // Execute your request and catch response
-                    HttpResponse response = httpClient.execute(getRequest);
+            // Execute your request and catch response
+            HttpResponse response = httpClient.execute(getRequest);
 
-                    // Check for HTTP response code: 200 = success
-                    if (response.getStatusLine().getStatusCode() != 200) {
-                            throw new RuntimeException("Failed : HTTP error code : " + response.getStatusLine().getStatusCode());
-                    }
+            // Check for HTTP response code: 200 = success
+            if (response.getStatusLine().getStatusCode() != 200) {
+                throw new RuntimeException("Failed : HTTP error code : " + response.getStatusLine().getStatusCode());
+            }
 
-                    // Get-Capture Complete application/xml body response
-                    BufferedReader br = new BufferedReader(new InputStreamReader((response.getEntity().getContent())));
-                    String output;
-                    System.out.println("============Output:============");
+            // Get-Capture Complete application/xml body response
+            BufferedReader br = new BufferedReader(new InputStreamReader((response.getEntity().getContent())));
+            String output;
+            System.out.println("============Output:============");
 
-                    // Simply iterate through XML response and show on console.
-                    while ((output = br.readLine()) != null) {
-                            System.out.println(output);
-                    }
+            // Simply iterate through XML response and show on console.
+            while ((output = br.readLine()) != null) {
+                    System.out.println(output);
+            }
 
-            } catch (ClientProtocolException e) {
-                    e.printStackTrace();
+        } catch (ClientProtocolException e) {
+            e.printStackTrace();
 
-            } catch (IOException e) {
-                    e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
