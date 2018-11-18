@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+    public static StartRestServer testRSInstance;
     
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.print("Start as: ");
@@ -34,7 +35,8 @@ public class Main {
             } else if (s.equalsIgnoreCase("testerF")) {
                 new FrontEnd().startFrontend();
             } else if (s.equalsIgnoreCase("RS")) {
-                new StartRestServer().start();
+                testRSInstance = new StartRestServer();
+                testRSInstance.start();
             } else if (s.equalsIgnoreCase("RC")) {
                 System.out.print("To (no null): ");
                 new StartRestClient().start(new BufferedReader(new InputStreamReader(System.in)).readLine());

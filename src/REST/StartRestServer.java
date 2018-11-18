@@ -9,9 +9,9 @@ import Utils.StringUtil;
 import blockchain.Block;
 import blockchain.NodeWallet;
 import blockchain.Transaction;
-import blockchain.BlockchainDB;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static blockchain.Main.testRSInstance;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import javax.swing.JOptionPane;
 
 import com.sun.jersey.api.container.httpserver.HttpServerFactory;
@@ -31,17 +31,17 @@ public class StartRestServer
 {
     private final String localHost = new StringUtil().getIP("enp0s3");
     private List<Block> blockChain = new ArrayList<>();
-//    public BlockchainDB bc = new BlockchainDB();
+    public final Gson gson = new GsonBuilder().create();
+    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
     
     public void start() throws IllegalArgumentException, IOException
     {
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
         HttpServer server = HttpServerFactory.create("http://"+ localHost +":8080/api");
         server.start();
-        
+
         GenesisBlockGenerator();
-        
-        System.out.println(new ObjectMapper().writeValueAsString(blockChain.get(0)));
+        System.out.println(gson.toJson(blockChain.get(0)));
         JOptionPane.showMessageDialog(null, "Press OK to shutdown server.");
         server.stop(0);
         
@@ -74,16 +74,14 @@ public class StartRestServer
     @GET
     @Path("block/index/{index}")
     @Produces(MediaType.APPLICATION_JSON)
-    public String getMessage(@PathParam("index") int index) throws JsonProcessingException
-    {
+    public String getMessage(@PathParam("index") int index){
         System.out.println("\nReceived GET Request");
-        System.out.println(blockChain.size());
+        System.out.println(testRSInstance.blockChain.size());
         // Generate message
-        Block sendBlock = blockChain.get(index);
+        Block sendBlock = testRSInstance.blockChain.get(index);
 
         // Serialise Message
-        ObjectMapper mapper = new ObjectMapper();
-        String messageAsJSONstring = mapper.writeValueAsString(sendBlock);
+        String messageAsJSONstring = gson.toJson(sendBlock);
 
         return messageAsJSONstring;
     }

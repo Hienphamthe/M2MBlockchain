@@ -9,16 +9,18 @@ import java.io.IOException;
 
 import javax.ws.rs.core.MediaType;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
 
 import blockchain.Block;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class StartRestClient
 {
     private String serverURL;
+    public final Gson gson = new GsonBuilder().create();
+    public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
 
     public void start(String toIP) throws IOException
     {
@@ -47,66 +49,65 @@ public class StartRestClient
         System.out.println("Received JSON String:\n" + response);
 
         // Deserialise Message
-        ObjectMapper mapper = new ObjectMapper();
-        Block receivedBlock = mapper.readValue(response, Block.class);
+        Block receivedBlock = gson.fromJson(response, Block.class);
         System.out.println("Creating Message Object...\n" + receivedBlock);
     }
 
 
 
 
-    private void doPostRequest() throws JsonProcessingException
-    {
-        Message message = Message.generateExampleMessage();
-
-        // Serialise Message Object
-        ObjectMapper mapper = new ObjectMapper();
-
-        String messageAsJSONstring = mapper.writeValueAsString(message);
-
-        // Send POST request
-        Client create = Client.create();
-        WebResource service = create.resource(serverURL);
-        String response = service.path("message").type(MediaType.APPLICATION_JSON).post(String.class, messageAsJSONstring);
-        System.out.println(response);
-    }
-
-
-
-
-    private void doPutRequest() throws JsonProcessingException
-    {
-        Message message = Message.generateExampleMessage();
-
-        // Serialise Message Object
-        ObjectMapper mapper = new ObjectMapper();
-
-        String messageAsJSONstring = mapper.writeValueAsString(message);
-
-        // Send PUT request
-        Client create = Client.create();
-        WebResource service = create.resource(serverURL);
-        String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).put(String.class, messageAsJSONstring);
-        System.out.println(response);
-    }
-
-
-
-
-    private void doDeleteRequest() throws JsonProcessingException
-    {
-        Message message = Message.generateExampleMessage();
-
-        // Serialise Message Object
-        ObjectMapper mapper = new ObjectMapper();
-
-        String messageAsJSONstring = mapper.writeValueAsString(message);
-
-        // Send DELETE request
-        Client create = Client.create();
-        WebResource service = create.resource(serverURL);
-        String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).delete(String.class, messageAsJSONstring);
-        System.out.println(response);
-    }
+//    private void doPostRequest() throws JsonProcessingException
+//    {
+//        Message message = Message.generateExampleMessage();
+//
+//        // Serialise Message Object
+//        ObjectMapper mapper = new ObjectMapper();
+//
+//        String messageAsJSONstring = mapper.writeValueAsString(message);
+//
+//        // Send POST request
+//        Client create = Client.create();
+//        WebResource service = create.resource(serverURL);
+//        String response = service.path("message").type(MediaType.APPLICATION_JSON).post(String.class, messageAsJSONstring);
+//        System.out.println(response);
+//    }
+//
+//
+//
+//
+//    private void doPutRequest() throws JsonProcessingException
+//    {
+//        Message message = Message.generateExampleMessage();
+//
+//        // Serialise Message Object
+//        ObjectMapper mapper = new ObjectMapper();
+//
+//        String messageAsJSONstring = mapper.writeValueAsString(message);
+//
+//        // Send PUT request
+//        Client create = Client.create();
+//        WebResource service = create.resource(serverURL);
+//        String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).put(String.class, messageAsJSONstring);
+//        System.out.println(response);
+//    }
+//
+//
+//
+//
+//    private void doDeleteRequest() throws JsonProcessingException
+//    {
+//        Message message = Message.generateExampleMessage();
+//
+//        // Serialise Message Object
+//        ObjectMapper mapper = new ObjectMapper();
+//
+//        String messageAsJSONstring = mapper.writeValueAsString(message);
+//
+//        // Send DELETE request
+//        Client create = Client.create();
+//        WebResource service = create.resource(serverURL);
+//        String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).delete(String.class, messageAsJSONstring);
+//        System.out.println(response);
+//    }
 }
 
