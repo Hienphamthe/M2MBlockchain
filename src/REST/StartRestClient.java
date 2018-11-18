@@ -14,43 +14,48 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
 
-import REST.Message;
+import blockchain.Block;
 
 public class StartRestClient
 {
+    private String serverURL;
 
-    public static void main(String[] args) throws IOException
+    public void start(String toIP) throws IOException
     {
+        serverURL = "http://"+ toIP +":8080/api";
+        
         doGetRequest();
 
-        doPostRequest();
+//        doPostRequest();
 
-        doPutRequest();
+//        doPutRequest();
 
-        doDeleteRequest();
+//        doDeleteRequest();
     }
 
 
 
 
-    private static void doGetRequest() throws IOException
+    private void doGetRequest() throws IOException
     {
+        int index = 0;
+        
         // Send GET request
-        WebResource service = Client.create().resource("http://localhost:8080/api");
-        String response = service.path("message").accept(MediaType.APPLICATION_JSON).get(String.class);
+        WebResource service = Client.create().resource(serverURL);
+        String response = service.path("block/index/"+index).accept(MediaType.APPLICATION_JSON).get(String.class);
 
         System.out.println("Received JSON String:\n" + response);
 
         // Deserialise Message
         ObjectMapper mapper = new ObjectMapper();
-        Message message = mapper.readValue(response, Message.class);
-        System.out.println("Creating Message Object...\n" + message);
+        Block receivedBlock = mapper.readValue(response, Block.class);
+        System.out.println("Creating Message Object...\n" + receivedBlock);
     }
 
 
 
 
-    private static void doPostRequest() throws JsonProcessingException
+    private void doPostRequest() throws JsonProcessingException
     {
         Message message = Message.generateExampleMessage();
 
@@ -61,7 +66,7 @@ public class StartRestClient
 
         // Send POST request
         Client create = Client.create();
-        WebResource service = create.resource("http://localhost:8080/api");
+        WebResource service = create.resource(serverURL);
         String response = service.path("message").type(MediaType.APPLICATION_JSON).post(String.class, messageAsJSONstring);
         System.out.println(response);
     }
@@ -69,7 +74,7 @@ public class StartRestClient
 
 
 
-    private static void doPutRequest() throws JsonProcessingException
+    private void doPutRequest() throws JsonProcessingException
     {
         Message message = Message.generateExampleMessage();
 
@@ -80,7 +85,7 @@ public class StartRestClient
 
         // Send PUT request
         Client create = Client.create();
-        WebResource service = create.resource("http://localhost:8080/api");
+        WebResource service = create.resource(serverURL);
         String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).put(String.class, messageAsJSONstring);
         System.out.println(response);
     }
@@ -88,7 +93,7 @@ public class StartRestClient
 
 
 
-    private static void doDeleteRequest() throws JsonProcessingException
+    private void doDeleteRequest() throws JsonProcessingException
     {
         Message message = Message.generateExampleMessage();
 
@@ -99,7 +104,7 @@ public class StartRestClient
 
         // Send DELETE request
         Client create = Client.create();
-        WebResource service = create.resource("http://localhost:8080/api");
+        WebResource service = create.resource(serverURL);
         String response = service.path("message").path(String.valueOf(message.getId())).type(MediaType.APPLICATION_JSON).delete(String.class, messageAsJSONstring);
         System.out.println(response);
     }

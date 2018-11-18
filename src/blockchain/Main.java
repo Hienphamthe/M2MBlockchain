@@ -2,12 +2,12 @@ package blockchain;
 
 import hacker.*;
 import p2p.*;
-
+import REST.*;
+import Utils.StringUtil;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +33,12 @@ public class Main {
                 new HackerBackEnd().startBackend();
             } else if (s.equalsIgnoreCase("testerF")) {
                 new FrontEnd().startFrontend();
-            }
-            else {
+            } else if (s.equalsIgnoreCase("RS")) {
+                new StartRestServer().start();
+            } else if (s.equalsIgnoreCase("RC")) {
+                System.out.print("To (no null): ");
+                new StartRestClient().start(new BufferedReader(new InputStreamReader(System.in)).readLine());
+            } else {
                 LOGGER.info("Input should be: frontend | backend | testerB | testerF");
             }
         }        
