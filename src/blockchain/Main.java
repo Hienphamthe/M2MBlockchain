@@ -19,7 +19,8 @@ import org.slf4j.LoggerFactory;
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
     public static StartRestServer testRSInstance;
-    
+    public static BackEnd backEnd;
+
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.print("Start as: ");
         BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in));
@@ -29,17 +30,18 @@ public class Main {
                 // backend must finish initializing before staring frontend
                 new FrontEnd().startFrontend();
             } else if (s.equalsIgnoreCase("backend")) {
-                new BackEnd().startBackend();
+                backEnd = new BackEnd();
+                backEnd.startBackend();
             } else if (s.equalsIgnoreCase("testerB")) {
                 new HackerBackEnd().startBackend();
             } else if (s.equalsIgnoreCase("testerF")) {
                 new FrontEnd().startFrontend();
-            } else if (s.equalsIgnoreCase("RS")) {
-                testRSInstance = new StartRestServer();
-                testRSInstance.start();
-            } else if (s.equalsIgnoreCase("RC")) {
-                System.out.print("To (no null): ");
-                new StartRestClient().start(new BufferedReader(new InputStreamReader(System.in)).readLine());
+//            } else if (s.equalsIgnoreCase("RS")) {
+//                testRSInstance = new StartRestServer();
+//                testRSInstance.start();
+//            } else if (s.equalsIgnoreCase("RC")) {
+//                System.out.print("To (no null): ");
+//                new StartRestClient().start(new BufferedReader(new InputStreamReader(System.in)).readLine());
             } else {
                 LOGGER.info("Input should be: frontend | backend | testerB | testerF");
             }
