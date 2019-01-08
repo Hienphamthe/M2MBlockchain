@@ -40,6 +40,7 @@ public class StartRestServer
     public void start(String localHost, int localPort) throws IllegalArgumentException, IOException
     {
 //        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        localHost="localhost";
         String serverAddress = "http://"+ localHost +":"+ localPort +"/";
         HttpServer server = HttpServerFactory.create(serverAddress);
         server.start();

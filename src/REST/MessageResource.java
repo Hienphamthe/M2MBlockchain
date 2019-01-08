@@ -27,7 +27,7 @@ import blockchain.Block;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-@Path("")
+@Path("app")
 public class MessageResource
 {
     public final Gson gson = new GsonBuilder().create();
@@ -53,8 +53,9 @@ public class MessageResource
     @Consumes(MediaType.TEXT_PLAIN)
     public String createMessage(String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
     {
-        System.out.println("\nReceived POST Request with JSON String:\n" + messageAsJSONstring);
-
+        System.out.println("\nReceived POST Request with string:\n" + messageAsJSONstring);
+        String[] payload = messageAsJSONstring.split("@");
+        backEnd.restClientNetwork.addPeer(payload[0], payload[1]);
         // Deserialise JSON message
 //        ObjectMapper mapper = new ObjectMapper();
 //        Message message = mapper.readValue(messageAsJSONstring, Message.class);

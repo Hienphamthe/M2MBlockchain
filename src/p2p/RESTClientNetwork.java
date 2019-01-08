@@ -19,7 +19,7 @@ public class RESTClientNetwork extends Thread {
     private ArrayList<String> receivedData = new ArrayList<>();
     
     public void addPeer(String peerHost, String peerPort) {
-        peerList.add("http://"+ peerHost +":"+ peerPort +"/");
+        peerList.add("http://"+ peerHost +":"+ peerPort +"/app/");
     }
     
     public void intro (String address) {

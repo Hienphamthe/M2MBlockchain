@@ -64,6 +64,7 @@ public class BackEnd {
     public Thread mineT;
     public MiningThread mineObj;
     public boolean runningMiningThread = false;
+    public RESTClientNetwork restClientNetwork;
     public final Gson gson = new GsonBuilder().create();
     public final Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
     // Extension
@@ -88,7 +89,7 @@ public class BackEnd {
 //        PeerNetwork peerNetwork = new PeerNetwork(localPort);
 //        peerNetwork.start();
         //Start rest client network
-        RESTClientNetwork restClientNetwork = new RESTClientNetwork();
+        restClientNetwork = new RESTClientNetwork();
         new StartRestServer().start(localHost, localPort);
         RpcServer rpcAgent = new RpcServer(localPort+1);
         rpcAgent.start();
@@ -130,10 +131,10 @@ public class BackEnd {
                         continue;
                     }
                     peersListMainThread.add(peer);
-                    restClientNetwork.addPeer(addr[0], addr[1]);
-//                    restClientNetwork.intro(localSocketDirectory);
-                }
+                    restClientNetwork.addPeer(addr[0], addr[1]);                   
+                }      
                 String localSocket = localHost+":"+localPort;
+                restClientNetwork.intro(localSocket);
                 if (!isLocalSocket) FileUtils.writeStringToFile(peerFile, "\r\n"+localSocket,StandardCharsets.UTF_8,true);
             }
             if (dataFile.exists()){
