@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package REST;
 
 import static blockchain.Main.backEnd;
@@ -38,7 +33,7 @@ public class MessageResource
     @Produces(MediaType.APPLICATION_JSON)
     public String getMessage(@PathParam("index") int index) throws JsonProcessingException
     {
-        System.out.println("\nReceived GET Request");
+        System.out.println("\nReceived GET_BLOCK "+index+ " request");
         // Generate message
         Block sendBlock = backEnd.blockChain.get(index);
 
@@ -53,15 +48,22 @@ public class MessageResource
     @Consumes(MediaType.TEXT_PLAIN)
     public String createMessage(String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
     {
-        System.out.println("\nReceived POST Request with string:\n" + messageAsJSONstring);
-        String[] payload = messageAsJSONstring.split("@");
+        System.out.println("\nReceived POST Request to peer address with string:\n" + messageAsJSONstring);
+        String[] payload = messageAsJSONstring.split(":");
         backEnd.restClientNetwork.addPeer(payload[0], payload[1]);
-        // Deserialise JSON message
-//        ObjectMapper mapper = new ObjectMapper();
-//        Message message = mapper.readValue(messageAsJSONstring, Message.class);
-//        System.out.println("Creating Message Object...\n" + messageAsJSONstring);
-
         return "OK";
+    }
+    
+    @POST
+    @Path("blockchain/blockheight")
+    @Produces(MediaType.TEXT_PLAIN)
+    @Consumes(MediaType.TEXT_PLAIN)
+    public String createBlockheight(String messageAsJSONstring) throws JsonParseException, JsonMappingException, IOException
+    {
+        System.out.println("\nReceived POST Request to blockheight with string:\n" + messageAsJSONstring);
+        int receiveBlockHeight = Integer.parseInt(messageAsJSONstring); 
+        backEnd.bestHeight = Math.max(backEnd.bestHeight, receiveBlockHeight);
+        return String.valueOf(backEnd.bestHeight);
     }
     
 //    @PUT
